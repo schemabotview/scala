@@ -2,3 +2,4 @@
 /.venv/
 *.iml
 .aider*
+/practice/sample/src/main/scala/.scala-build/
