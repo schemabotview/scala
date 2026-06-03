@@ -1,47 +1,145 @@
-Welcome to notebook three. The previous notebook gave you values, the things your program holds onto. This notebook gives you the verbs that act on them. Functions and methods are the unit of behaviour in Scala.
+Functions and methods.
 
-Scala has two related but distinct ideas. There are methods, defined with the keyword def, which are attached to an enclosing class, object, or scope. And there are functions, which are first class values you can pass around like integers. Understanding the small gap between methods and functions, and how Scala bridges it for you automatically, is the single most important skill for reading idiomatic code. This matters especially for Spark, because Spark's entire application programming interface is built on passing functions to operators like map and filter.
+What is covered. This notebook walks through def, the method form you will use ninety percent of the time. The function-value form, written as parameter arrow body. The real difference between methods and function values on the java virtual machine, and the eta-expansion that bridges them. Higher-order functions, where functions become arguments and return values. Lambdas, the underscore shorthand, and when each is more readable. Named arguments and default parameters. Multiple parameter lists, and what they enable — better type inference, partial application, and the implicit-context shape you will see in Spark and in notebook eight. Currying and partial application, both with the dot curried helper and with the underscore in argument position. By-name parameters, where you pass an expression rather than its value. Vararg parameters. The function-n family, which is what a function value really is. Local functions, which are methods defined inside other methods. And a brief preview of the inline keyword.
 
-Let us start with the method. The keyword def introduces a method definition. The shape is, def, then the name of the method, then a parameter list inside parentheses with each parameter typed, then a colon and the return type, then an equals sign, then the body expression. The body is a single expression. Its value is what the method returns. There is no return keyword needed. The last expression in the body is the result.
+Def — the method form.
 
-For example, a method called square that takes one Int parameter named x and returns an Int is written as, def square, open paren, x colon Int, close paren, colon Int equals, x times x. Calling square of seven returns forty nine. A method called greet that takes a String parameter and returns a String is written, def greet, open paren, name colon String, close paren, colon String equals, then on the next line, indented, the interpolated string hello comma space dollar sign name.
+The everyday way to declare a piece of executable code in Scala is def. It defines a method, which is a member of a class, a trait, or a singleton object. A top-level def, with no enclosing object, compiles to a static method behind the scenes.
 
-When the body is longer than one line, it becomes a block expression. The same rules as in notebook two apply. The block's value is the value of its last expression, and that is what the method returns. If you want to compute a hypotenuse, you can bind the two squared sides as local values, then call the math square root method on their sum. The local values go out of scope when the method returns. The square root is what the method evaluates to.
+The full shape, with everything optional that is optional, is the keyword def, then a method name, then an optional type parameter list in square brackets, then a parameter list in parentheses, then a colon and a return type, then equals, then the body.
 
-Now an important rule. Scala will infer the type of a val. Scala will not infer the types of method parameters. Every parameter must carry a type annotation. If you forget one, the compiler stops you. Why this rule? A method is a contract. Callers need to know what they can pass in. Inferring parameter types at the call site would make signatures fragile and hard to read. So parameter types are mandatory. Return types are optional, with a caveat we will get to in a moment.
+Two things to remember from the start. The return type can be inferred, but for public methods you should write it. The notebook two rule for val applies here even more strongly. The return type is part of the method's contract. And the last expression in the body is the return value. No return keyword needed. You can write return, but in idiomatic Scala you almost never see it — it is mostly a debugging escape hatch.
 
-Method parameters can have default values. If the caller omits an argument, the default is used. For example, a greet method that takes a name and an optional greeting parameter with the default value hello can be called in three different ways. You can pass just the name, in which case the greeting defaults to hello. You can pass both name and greeting positionally. Or you can pass arguments by name, like name equals ganesh, greeting equals namaste. When you pass by name, the order does not matter. You can write greeting first and name second if you want.
+In code, picture three small methods. Def square, taking x of type integer, returning integer, body x times x. Def hypotenuse, taking two doubles a and b, returning double, body has a val sum of squares followed by a call to math dot square root of that val. Print square of seven, you see forty-nine. Print hypotenuse of three and four, you see five. And a unit method, def log, taking a level and a message, body just prints with a bracketed prefix.
 
-Defaults let you grow an application programming interface without breaking existing callers. Named arguments make calls self documenting. They are especially valuable when several parameters share the same type, for example when a method takes three Ints in a row. With positional arguments at the call site you cannot tell which Int is which. With named arguments you can.
+The function-value form — parameter arrow body.
 
-Now, return types. Scala can infer a method's return type from its body. But the inferred type leaks the implementation. The same guidance from notebook two applies, just sharper. For public methods, write the return type. It documents the contract. A change to the body that subtly changes the type will fail loudly at the boundary, not silently inside callers. For local or private helpers, let inference do its job. There is one case where the return type is not optional but required. Recursive methods. A method defined in terms of itself, like factorial, must declare its return type, because the compiler cannot infer the type of something that references itself.
+The other way to introduce a function in Scala is as a value. The syntax parentheses x colon integer, arrow, x plus one — produces a function value. An object you can store in a val, pass as an argument, or return from another function.
 
-What about methods that return nothing useful? Those return Unit. A Unit returning method is called for its side effect. Printing to the console, mutating something, writing to a file. It returns the single Unit value, written as a pair of empty parentheses, which carries no information. The body of a Unit returning method is just a sequence of statements ending in something that does not produce a value. There is a deprecated short form where you omit the equals sign, like def announce paren name colon String close paren, brace, body, brace. Avoid that form in Scala 3. The explicit colon Unit equals form is clearer about intent. This method exists for its side effect, not its value.
+A function value is a real object on the heap. Its type is one of the function-n traits in the standard library — function zero, function one, function two, all the way up to function twenty-two. The number is the parameter count.
 
-Now the second concept. Functions are values. Methods live attached to a scope. Function values, also called lambdas or anonymous functions, are objects you can name, store, return, and pass to other functions. The syntax to write a function value is a parameter list in parentheses, an arrow that looks like an equals sign followed by a greater than sign, and a body expression. For example, val double equals open paren, x colon Int, close paren, arrow, x times two. Calling double of seven returns fourteen. Another example, val add equals open paren, a colon Int comma b colon Int, close paren, arrow, a plus b. Calling add of three and four returns seven.
+The shape is — parameter list with parentheses, arrow, expression. For functions taking exactly one parameter, the parentheses around the parameter are optional. For functions taking zero parameters, you write empty parentheses arrow expression.
 
-The type of a function value is written with the same arrow between the parameter list and the result type. The double function has type Int arrow Int, which you read as, takes an Int and returns an Int. The add function has type, open paren Int comma Int close paren, arrow, Int. You read that as, takes an Int and an Int and returns an Int. That arrow notation appears everywhere in Scala. Get fluent with reading it.
+In code, picture this. Val square, of type integer arrow integer, equals parentheses x colon integer, arrow, x times x. Then square of seven is forty-nine. Square dot apply of seven is also forty-nine — the parentheses-call syntax is sugar for dot apply. Then a zero-arg form — val now, of type empty parentheses arrow long, equals empty parentheses arrow system dot current-time-millis. Call now of empty parentheses and you get a timestamp. Then a two-arg form — val add, of type parentheses integer comma integer arrow integer, equals parentheses a b arrow a plus b. The type ascription on the left tells the compiler what type the right-hand side should have. Without the ascription, you would write the types on the parameters themselves.
 
-Once you have function values, you unlock higher order functions. A higher order function is one that takes a function as an argument, returns a function as a result, or does both. This is the bread and butter of functional style Scala and of Spark's entire application programming interface. For example, a method called applyTwice that takes a function f from Int to Int and an Int x can apply that function twice. Its body is f of f of x. Calling applyTwice of double and five computes double of double of five, which is twenty.
+Methods versus function values — the gap and the bridge.
 
-When you pass a lambda inline as an argument, Scala has a useful shorthand. The underscore. You can write nums dot map of underscore plus one, and Scala expands that to nums dot map of, x arrow x plus one. The underscore stands for a parameter that is used exactly once, in order. It is idiomatic for short lambdas like incrementing or comparing. Use the full x arrow form when the body is non trivial. The underscore form is great when the lambda is one tight expression.
+A def defines a method, which is a member of some enclosing class. A parameter arrow expression introduces a function value, which is a heap object of type function-one or its siblings. On the java virtual machine these are two different things.
 
-Functions can also be returned from other functions. Consider a method called adder that takes an Int n and returns a function from Int to Int. The body of adder is the function value, x arrow x plus n. Calling adder of five returns a new function. That returned function adds five to whatever you give it. You can name it, call it plusFive, and then plusFive of ten gives you fifteen. The returned function carries the value five with it. That captured value is what closures are made of, and we will come back to closures in a minute.
+A method invocation compiles to an invoke-virtual or invoke-static bytecode instruction — no object allocation. A function value is a real object — calling it goes through its apply method.
 
-Now the precise distinction between methods and functions. A method, defined with def, is attached to a scope. It is not a value by itself. A function, written with the arrow syntax, is a value of some function type. You can store it in a val. You can put it in a list. You can pass it as an argument. Methods are not first class values. Functions are.
+This matters because most of the standard library and most Spark application programming interfaces are written to take function values — map, filter, for-each. You cannot pass a def directly to a parameter that expects a function-one of integer to integer. Except that the compiler does it for you. The conversion is called eta-expansion. The compiler wraps the method in a function value automatically when the context expects one.
 
-So how do you pass a method where a function value is expected? Scala's answer is called eta expansion. The compiler automatically converts a method into a function value when the context expects one. If you have a method called square and you call nums dot map of square, the compiler quietly rewrites that as nums dot map of, x arrow square of x. In Scala 3 this conversion happens automatically in any context that expects a function type. You do not have to do anything. If you ever need to force the conversion explicitly, you can append a trailing underscore to the method name, like square underscore. You will rarely need that. The practical takeaway is straightforward. Write your behaviour as methods using def. Define them once. Let the compiler hand them to map, filter, and flatMap as function values when needed.
+In Scala 3, eta-expansion happens implicitly anywhere a function type is expected. In Scala 2 you had to write a trailing underscore — square space underscore — to trigger it. You will see that underscore in older code; it is no longer required.
 
-Now a useful variation. A Scala method can have more than one parameter list. The body can use parameters from all of them. For example, def add open paren a colon Int close paren, open paren b colon Int close paren, colon Int equals, a plus b. Calling add of three and then of four returns seven. Two payoffs come from this shape.
+In code, picture a method def double, taking x of integer, returning integer, body x times two. Then a list of one through four, dot map of double. The method double is eta-expanded automatically into a function value. Print the result and you see two, four, six, eight. You can also force the eta-expansion explicitly by ascribing the method to a function type — val double-as-value of integer arrow integer equals double. The opposite direction is also free — wherever a method is expected, a function value works, because function-one defines apply.
 
-The first payoff is partial application. You can call the method with just the first list and you get back a function ready to be called with the rest. For example, val addThree equals add of three. The expression add of three does not produce a number. It produces a new function of type Int arrow Int. That function adds three to whatever you give it. Calling addThree of ten returns thirteen.
+Higher-order functions.
 
-The second payoff is that type inference flows left to right across parameter lists. A type the compiler infers from the first list is known by the time it reads the second list. We will lean on this idea hard in notebook eleven, when we meet given and using clauses. Spark itself uses multi parameter lists in some operators where the first list specifies what to do and a later list specifies how to do it, in a builder style API.
+A higher-order function is one that either takes a function as a parameter, returns a function, or both. This is the central idea that makes functional programming work — instead of writing one loop for each shape of transform every element, you write one method that takes a transformation as an argument.
 
-Now, closures. A closure is a function value that captures references to variables in the surrounding scope at the moment the function value is created. Recall the adder example. When you call adder of ten, the returned function value remembers ten. When you call adder of one hundred separately, that second returned function remembers one hundred. Each call to adder returns a different function value, because each one closes over a different n. The captured value travels with the function. That is the cleanest way to package a small piece of state with the behaviour that uses it.
+The standard library's collection methods are the canonical examples — map, filter, fold-left, reduce, take-while. We will cover those in depth in notebook four. Here the focus is — how you declare a higher-order function, and how you call one.
 
-Closures matter enormously in Spark. When you write rdd dot map of, x arrow x plus offset, Spark serialises that closure, including the captured offset value, and ships it to every executor in the cluster. The executors run the function with their own copy of offset. If offset were instead a mutable variable that lives only on the driver, the executors would see a stale snapshot, not the live value. Notebook fifteen will revisit closures from the serialisation angle, because that is where many real Spark bugs come from.
+In code, picture a declaration — def transform-all, taking a list of integer called x-s, and a function f of type integer arrow integer, returning a list of integer, body just x-s dot map of f. Then three different ways to call it. One — pass a previously defined method, like def triple, and the compiler eta-expands. Two — pass an inline lambda, x arrow x times ten. Three — pass the underscore shorthand, underscore plus one hundred. All three return the expected list.
 
-Let us close this notebook with a small example that uses every piece. First, define a method called isAbove. It takes a threshold in its first parameter list and a value in its second parameter list, and it returns a Boolean. Second, partially apply it to produce a function value with the threshold baked in. Call the result isAboveTen. Its type is, Int arrow Boolean. Third, use the higher order method filter on a list of numbers, passing isAboveTen as the predicate. The result is the sublist of numbers greater than ten. And fourth, write the same idea inline with an underscore lambda. Both lines compile to the same bytecode. The choice between them is purely a style question. Extract a named function when the predicate has a meaningful name, is complex, or is used more than once. Inline a lambda when it is small and used once.
+And returning a function from a function. Def adder-factory, taking a base of integer, returning the function integer arrow integer, body returns parentheses x colon integer arrow base plus x. Bind val add-five to adder-factory of five, and val add-ten to adder-factory of ten. Each is now a real function value that adds its captured base to whatever you pass.
 
-You can now write methods, define functions as values, pass them to higher order operators, and capture surrounding state in closures. Notebook four introduces collections. List, Vector, Map, Set, and Array. Those are the data shapes that all the higher order functions you just learned will operate on. After that, notebook five ties everything together with map, filter, fold, and for yield over real data.
+Lambdas and the underscore shorthand.
+
+A lambda is just a function value written inline at the call site. The syntax variations all do the same thing — the shortest readable form is the one to use.
+
+Three forms, increasing in compactness. The full form, x-s dot map of parentheses x colon integer arrow x times two. The inferred form, x-s dot map of x arrow x times two — the parameter type is inferred from the expected parameter type of map. And the underscore form, x-s dot map of underscore times two.
+
+The underscore shorthand is the most compact form. Each underscore in the expression stands for a fresh parameter, positionally. Underscore plus underscore is parentheses a b arrow a plus b. It is concise, but it only works when each parameter is used exactly once and in the order it appears. The moment you need to reuse a parameter, or use them out of order, fall back to the named-parameter form.
+
+In code, picture x-s as a list of one through four. The three forms all print two, four, six, eight. Underscore plus underscore on a two-arg reduce — x-s dot reduce of underscore plus underscore — returns the sum, ten. Where underscore breaks down — x-s dot map of underscore arrow underscore — would be interpreted as two underscores, two parameters, not what you meant. The right form is x-s dot map of x arrow x arrow x, which builds the pairs.
+
+Named arguments and default parameters.
+
+Two features that together remove the most common class of bug in any language with positional parameters — passing the right values in the wrong order.
+
+Named arguments. At the call site, you can label any argument with its parameter name. The compiler matches by name, not by position. This makes calls with many parameters readable, and lets you skip optional parameters by name.
+
+Default parameters. In the definition, any parameter can have a default value. Callers that omit it get the default.
+
+Together they enable a style where complex configurations stay readable. Connect of host equals db dot local, port equals fifty four thirty-two, ssl equals true — is unambiguous, even when the same method has eight parameters.
+
+In code, picture a method def connect taking host, port defaulting to fifty four thirty-two, user defaulting to scala, ssl defaulting to false, returning a j-d-b-c connection string. You can call it all positionally — connect of db dot local, fifty four thirty-three, ganesh, true. You can call it with named arguments — connect of host equals db dot local, ssl equals true. You can mix positional and named, as long as positional come first.
+
+Multiple parameter lists — and why they matter.
+
+A def can have more than one parameter list. The syntax just repeats the list — def f, open paren a integer close paren, open paren b integer close paren, returning integer, body a plus b. You call it the same way — f of one of two. At the surface this looks like a cosmetic variation, but it enables three things you cannot get from a single parameter list.
+
+Type inference flows left to right. Scala infers types one parameter list at a time. If the result of the first list constrains what the second list's lambda parameters should be, multiple lists make the inference work. You will see this constantly in higher-order calls — fold-left is declared with two lists exactly for this reason.
+
+Partial application. Apply only the first list, omit the rest, and you get a function value waiting for the missing arguments. We will see this in the next section.
+
+The using parameter list. Scala 3 puts implicit parameters in their own parameter list with the using keyword. Notebook eight covers this in depth. A method like def foo of x integer, then a separate using list, puts the explicit parameter in the first list and the implicit one in the second.
+
+In code, picture fold-left in action. A list of one through four, dot fold-left of zero, then a second parameter list with the combining function — parentheses acc x arrow acc plus x. The seed value zero informs the inference of the accumulator type, and then the lambda parameter types come for free. If fold-left had been declared with one parameter list, you would have had to write the parameter types yourself.
+
+A user-defined example with the same shape — def transform-with, generic over a and b, taking a list of a, then a second list taking a function a arrow b, returning a list of b. At the call site, transform-with of list of one two three, then parentheses underscore times two, the underscore-shorthand lambda has its parameter type inferred from the list element type.
+
+Currying and partial application.
+
+A curried function is one whose parameters live in separate single-element parameter lists. So instead of def add taking a comma b in one list, you write def add of a in one list, of b in a second list. The two are not the same shape at the type level. The curried version has type integer arrow integer arrow integer. The uncurried one has type parentheses integer comma integer arrow integer.
+
+Why anyone bothers. A curried function makes partial application natural. Add of five gives you back a function that adds five to its argument — without writing a lambda yourself.
+
+Scala gives you both directions. Dot curried on a function value returns the curried version. Function dot uncurried of f does the reverse. The underscore in argument position is the manual way to partially apply any method or function — fill in some arguments, leave an underscore for the rest, get back a function.
+
+In code, picture def add-curried in two separate parameter lists. Then val add-five of integer arrow integer equals add-curried of five — the partial application gives you the function. Add-five of three is eight, add-five of ten is fifteen. Picture an uncurried function value, then dot curried on it gives the curried form. Then the underscore-based form on a regular method — def greet taking greeting and name. Val say-hello of string arrow string equals greet of hello comma underscore. Val greet-ganesh of string arrow string equals greet of underscore comma ganesh. Each fills one parameter and leaves the other free.
+
+By-name parameters — passing the expression, not its value.
+
+By default, when you call f of an expression, Scala evaluates the expression before calling f. The value goes in, not the expression.
+
+A by-name parameter flips that. Declared as x colon arrow a — with the arrow but no parameter list to its left — it passes the unevaluated expression. Each time the method body references x, the expression is re-evaluated.
+
+Two real uses. Control-flow application programming interfaces. Building your own if, your own unless, your own retry loop. The body of the construct must not run until the right moment — by-name parameters give you that. And cheap compute only if needed. A logging method's expensive message string should only be built if the log level is enabled. By-name lets you write logger dot debug of the expensive-build call, and have the message-building deferred.
+
+Do not reach for by-name in everyday code. It introduces lazy evaluation in a place callers do not expect, and re-evaluating the same expression every reference can be expensive.
+
+In code, picture two log methods. Log-eager takes a level and a regular message string. Log-lazy takes a level and a by-name message — message colon arrow string. Then a function called expensive that prints a message when it runs and returns a string. Call log-eager with the i-n-f-o level and the result of expensive — expensive runs anyway, even though no log message will be emitted. Call log-lazy with the same arguments — expensive does not run, because the by-name parameter is only evaluated inside the conditional, which does not fire.
+
+Building your own control structure. Def retry, taking an integer times in the first list, and a by-name body in the second list. Body has a loop that tries the body, catches any throwable, retries up to the count, and rethrows the last error. You then use it like a built-in — retry of three, then a brace-block with the attempted code.
+
+Vararg parameters.
+
+A star after a parameter type marks it as a vararg. The caller can pass any number of arguments of that type. Inside the method, the parameter is a sequence of that type.
+
+To pass an existing collection as varargs, append a star to the argument at the call site — f of x-s star. In Scala 2 this was x-s colon underscore star.
+
+In code, picture def join-all, taking a separator string and parts as a vararg of string, returning the parts joined by the separator. Call it as join-all of comma space, then a, b, c — and you get a, b, c. To splat an existing collection, bind val tokens to a list of three strings, then call join-all of pipe space, then tokens star — and you get the joined string.
+
+The function-n family — what a function value really is.
+
+When you write parameter arrow expression, the compiler creates an instance of scala dot function-one of the parameter type and the result type. Function-one is a trait in the standard library; its only abstract method is apply, taking a parameter and returning a result.
+
+There is one function-n trait per arity from function zero, with zero parameters, up to function twenty-two. Beyond twenty-two you have to drop into other shapes — tuples, case classes — but you will rarely hit that limit.
+
+This matters in three places. Reading method signatures — when the Scala docs say a parameter is of type integer arrow integer, they mean function-one of integer and integer. The arrow form is sugar over the trait. Defining function-like classes — any class that defines an apply method can be called with parentheses syntax. My-object of arg desugars to my-object dot apply of arg. This is how list of one two three works — list the companion object has an apply method. And Spark's own internals — Spark's function-one boundary is where serialization happens. When a lambda is shipped to an executor, it is the function value that gets pickled and sent.
+
+In code, picture a val f of type function-one of integer and integer equals parentheses x integer arrow x plus one. Both f dot apply of ten and f of ten return eleven. Then a class greeter with an apply method that takes a name and returns a greeting. Construct it, then call g of ganesh — that desugars to g dot apply of ganesh. This is exactly why list of one two three works — list as a companion object has an apply method, and the parens-call syntax is sugar for dot apply.
+
+Methods inside methods — local functions.
+
+Methods can be defined inside other methods. The inner method is only visible within the enclosing method. Use this when you have a helper that is meaningful only in the context of one outer computation — the alternative is polluting the enclosing class with a private method nobody else should call.
+
+Local methods close over the values in their enclosing scope, so they can reference parameters and local vals of the outer method directly.
+
+In code, picture def format-invoice, taking a list of pairs of name and amount. Inside, def line takes a name and an amount and returns an f-string of the formatted line. Def total has no parameters — it sums the amounts from the captured outer parameter items. Then the body builds the body lines, builds the total footer line, and joins them with newlines. Both inner methods are scoped to format-invoice — they are not visible outside.
+
+Preview — inline def.
+
+Scala 3 adds an inline keyword that turns a method into a compile-time macro. The compiler substitutes the body at the call site instead of generating a real method call.
+
+You will rarely need this in everyday code. It is mostly relevant for library authors writing performance-critical code or compile-time computation. Mentioned here only so the keyword does not surprise you when you encounter it. Notebook seven will use it briefly in the context of opaque types.
+
+Picture inline def square of x integer returning integer equals x times x. Then val n equals square of ten. At compile time, that call site becomes val n equals ten times ten. No method invocation at runtime.
+
+What is next.
+
+You now have functions as first-class values. The difference between methods and function values. And the syntactic features that make Scala's function-rich style pleasant — defaults, named arguments, multiple parameter lists, by-name, varargs.
+
+Notebook four puts these to work on the data shapes you reach for daily — list, vector, set, map, array. And the higher-order operations that operate over them — map, filter, fold, group-by, and the for-yield sugar that desugars into exactly those calls.

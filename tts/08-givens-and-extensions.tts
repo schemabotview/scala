@@ -1,0 +1,131 @@
+Givens and extensions.
+
+What is covered. The Scala 2 implicit keyword was one of the language's most powerful features and one of its most confusing. Scala 3 rebuilt the same machinery under clearer names — given, using, extension — and tightened the rules so each name does exactly one job.
+
+The agenda. The problem implicits solve — context that you do not want to thread through every call by hand. Using parameters — the modern syntax for implicit arguments. Given instances — the modern syntax for providing implicit values. Where the compiler looks for givens — implicit scope. Type classes — what they are, why Scala does them this way, and the standard pattern. The three pieces of a type class — the trait, the given instance, and the summoner method. Summon, the explicit lookup. Extension methods — adding methods to types you do not own, the right way. Combining extensions with type classes — the receiver-style sugar. Context bounds — square bracket a colon ordering as shorthand. Using chains for composing environments. Conversions for safe automatic conversions. What ecosystem application programming interfaces use this. And a short reference for translating Scala 2 implicit patterns to Scala 3 syntax.
+
+The problem implicits solve.
+
+Some pieces of context need to be available across many calls in a chain but they are not the subject of any single call. The classic examples. An execution context for every future operation in your code. An ordering that tells list dot sorted how to compare elements of a generic type. A numeric instance that tells a generic sum method how to add elements together. A logging context carrying a trace i-d and a request i-d through every layer. A Spark encoder describing how to serialize values into Spark's columnar memory.
+
+If you thread these through manually, every method gains an extra parameter, every call site gets noisier, and you stop being able to compose generic operations cleanly. Context parameters let the compiler pass them for you — you declare what you need, and the compiler finds a value of that type in scope and passes it on your behalf.
+
+Using parameters — declaring I need this in context.
+
+A using parameter list is a regular parameter list with one keyword change — the compiler is responsible for finding the argument, not the caller.
+
+The shape. The method declares a second parameter list with the using keyword. At the call site, you just call the method with the regular arguments — no second list. The compiler looks for a value of the required type in scope and inserts it. If the compiler cannot find one, you get a compile-time error — no given instance of type ordering of a was found.
+
+Using parameters can be anonymous, with no name, if you do not need to reference them by name in the body. Most of the time you do not.
+
+In code, picture an anonymous using example. Def max-of, generic over a, taking a and b, then a using parameter of ordering of a with no name. The body calls summon of ordering of a dot compare. Max-of of ten and twenty returns twenty, using the built-in ordering of integer. Max-of of alice and bob returns bob, using ordering of string.
+
+Then a named using example. Def join-sorted, taking a list of a, then a using parameter named ord of ordering of a. The body calls x-s dot sorted of using ord then dot make-string of less-than less-than less-than. Useful when the body needs to call methods on the parameter directly.
+
+Given instances — providing a value to context.
+
+A given declares an instance the compiler can pick up when looking for a using argument. The shape — given ordering of person with, on the next line indented, def compare taking a and b of person returning integer. Or shorter, when the given is just a value, given custom-execution-context colon execution-context equals execution-context dot global.
+
+The optional name, like custom-execution-context, is purely for documentation and for letting you import or summon it explicitly. The given is found by type, not by name.
+
+In code, picture case class person with name and age. Given ordering of person with def compare returns a dot age minus b dot age — orders by age. List of three people. People dot sorted uses the given automatically and orders by age. Multiple givens for the same type are an error — but you can scope them inside an object. Object by-name with a different given ordering of person, by name. Import by-name dot given brings that into scope, and now sorted uses the by-name ordering.
+
+Where the compiler looks for givens — implicit scope.
+
+The compiler resolves using arguments by searching specific places in a fixed order. The full rules are intricate, but the practical version covers ninety-nine percent of cases.
+
+First, local definitions — givens defined in the current scope or any enclosing scope, including imports made into scope via import x dot given. Second, companion objects of the type — if you are looking for ordering of person, the compiler checks the companion of ordering and the companion of person. Third, companion objects of related types — base types, type-argument types, and so on.
+
+The takeaway. Put your given instances in the companion object of one of the types involved. They will be found automatically without anyone needing to import them, and there is no risk of the wrong instance being picked up from somewhere unrelated.
+
+In code, picture case class money with cents. Object money with a given ordering of money sorting by cents. List of four prices. Sorted picks up the given automatically — no import needed.
+
+Type classes — the dominant pattern this enables.
+
+A type class is a contract that says any type a that has an instance of my-class of a available can do these operations. Instead of subtyping, where the type itself implements an interface, the capability is provided externally, by a separate value, the instance.
+
+Three pieces define a type class. The trait — trait show of a with a show method taking a and returning string. The contract. Given instances — for the types that should support the operation. Given show of integer with def show returning n dot to-string. A summoner method — usually a using parameter on a generic method, possibly with an extension method for sugar at the call site.
+
+The win over subtyping. You can add capabilities to types you do not own — string and integer are in the standard library, but you can write a show instance for both. You can have multiple instances scoped differently — person can be ordered by age in one module, by name in another. The capability is decoupled from the type — a person is not a show, it just has a show instance available.
+
+In code, picture the three pieces. Trait show of a with def show taking a returning string. Given show of integer with def show returning s-string of int n. Given show of string with def show returning s-string of string quoted. A given that depends on another given — given show-list, generic over a with a using show of a called inner, of type show of list of a, with def show that maps each element through inner dot show and joins with brackets. The summoner — def describe, generic over a, taking a and a using show of a called s, returning s dot show of a. Describe of forty-two prints int forty-two. Describe of hello prints string hello. Describe of list of one, two, three prints the bracketed forms. Describe of nested lists prints nested brackets — the recursive show-list given fires twice.
+
+Summon and explicit context lookup.
+
+Summon of t returns the given instance of type t from scope. Useful inside a method body when you want to use the given instance directly without naming it as a using parameter.
+
+It is essentially shorthand for the older the of t from Scala 2 days, and it composes nicely with type-class designs.
+
+In code, picture trait show of a with show. Given show of integer with show returns int n. Def show-it, generic over a with a context bound on show — that is sugar for a using show of a — taking a, returning summon of show of a dot show of a. Show-it of forty-two prints int forty-two.
+
+Extension methods — adding methods to types you do not own.
+
+An extension block adds methods to an existing type. The methods look like they are defined on the type, but they are really just regular methods translated by the compiler. No subclassing, no monkey-patching, no runtime cost beyond the method call itself.
+
+The shape. Extension parenthesis s colon string close paren, then on the next line indented, def shout returning s dot to-upper-case plus an exclamation. Then dot shout works on any string — quote hello quote dot shout returns capital hello with an exclamation.
+
+This is how you would add dot to-json to your own case classes, dot snake-case to string, or any domain-specific shorthand.
+
+In code, picture extension of s on string, with three methods. Def shout returns the upper case plus exclamation. Def reverse-words splits by space, reverses, joins. Def truncate of n returns s if short enough, otherwise take n plus three dots. Then call hello dot shout, the quick brown fox dot reverse-words, the long sentence here dot truncate of ten — each works.
+
+Extension on a generic type. Extension of x-s on list of a — that is square bracket a in the extension list, then x-s colon list of a. Def second returns x-s of one. Def safe-head returns none if empty otherwise some of head. List of ten, twenty, thirty dot second returns twenty. Empty list dot safe-head returns none. List of one dot safe-head returns some of one.
+
+Extensions plus type classes — the receiver sugar.
+
+Combine an extension method with a type-class lookup, and you get the calls a method on the value, but the implementation comes from a given instance pattern. This is exactly how the standard library's x-s dot sorted works.
+
+Picture trait show of a. Then extension of a on type a with a using show of a called s. Def show returns s dot show of a. Now anywhere a show of a is in scope, you can call a dot show on any value. Forty-two dot show. Hello dot show. List of one, two, three dot show.
+
+This style reads better than describe of forty-two and is what most modern Scala libraries adopt. It is what the cats library's my-value dot as-json does, what the z-i-o library's effect dot flat-map does, and what a whole layer of derivative ergonomics in Scala 3 rest on.
+
+In code, picture the three pieces — show trait, integer instance, string instance with quoted output, and list-show recursive instance. Then the extension method on a using show of a, giving every value with a show instance a dot show method. Forty-two dot show. Hi dot show. List of one, two, three dot show. List of a, b dot show. All the dot show calls work through the type-class machinery.
+
+Context bounds — square bracket a colon type-class.
+
+When a generic method needs an instance of a type class, the literal way to write it is def max-of, generic over a, taking a list of a, then a using ordering of a called ord, returning a.
+
+That is verbose. Scala lets you abbreviate with a context bound. Def max-of, generic over a with the context bound colon ordering, taking a list of a, returning a.
+
+Square bracket a colon ordering is sugar for there is a using ordering of a parameter on this method. Inside the body, you retrieve the instance with summon of ordering of a. The context-bound form is what you will see in most Scala 3 library code.
+
+In code, picture the verbose form first — def max-verbose, generic over a, with a using ordering of a called ord, taking a list of a, returning a, body uses ord dot g-t. Then the concise form — def max-concise, generic over a with the context bound on ordering, taking a list of a, returning a, body binds ord to summon of ordering of a, then uses ord dot g-t. Both give the same result on a list of integers or strings.
+
+Multiple context bounds compose. Def show, generic over a with two context bounds on show and ordering, taking a list of a, returning a string of the sorted and shown elements. Trait show, given show of integer, the extension method, and then show of list of three, one, four, one, five gives the sorted bracket list.
+
+Using chains — composing environments.
+
+A method's using parameter list can require multiple contexts at once. Each one becomes a separate lookup. This is how you compose larger environments — a method that uses both an execution context and a tracer just lists both.
+
+In code, picture trait tracer with trace, trait clock with now. Def logged-op taking a name in the first list, a by-name body of type a in the second list, and a using tracer and clock in the third list. Inside, the body traces start, runs the body, traces done with elapsed time, returns the result. Provide both givens — given tracer with trace printing the message, given clock with now returning current millis. Call logged-op of the name compute, with a body block doing some work — and you see the trace lines around the result.
+
+Conversions — given conversion of a and b.
+
+A given conversion of a and b tells the compiler an a may be silently converted to a b. This is the modern, scoped form of Scala 2's free-for-all implicit def a-to-b.
+
+Use sparingly. Automatic conversions can hide intent and produce confusing error messages. They are most defensible at boundaries — converting a string to a path at i-o boundaries, converting a domain primitive to its wrapping case class.
+
+To opt in, you must import scala dot language dot implicit-conversions in any file that uses one. The friction is intentional.
+
+In code, picture case class user-i-d wrapping a string. Given conversion of string and user-i-d implemented as wrapping the string in user-i-d. Def find-user takes a user-i-d. Then find-user of the literal u dash zero zero one works — the string is converted to a user-i-d. Find-user of user-i-d of u dash zero zero two also works — explicit construction.
+
+Standard library and ecosystem application programming interfaces that use this.
+
+A short tour, so you recognize the pattern when you read other people's code.
+
+Ordering of a — passed implicitly to sorted, sort-by, min, max. Numeric of a — passed implicitly to generic sum, product. Execution context — required by every future combinator. We will see this in notebook nine. Class-tag of a — required by new array of a of size, because of erasure from notebook seven. Spark encoder of t — Spark uses a type class called encoder to know how to serialize a t into the columnar in-memory format. Spark dot implicits dot underscore brings the basic instances into scope. The j-s-o-n codec libraries — circe, u pickle, play j-s-o-n. Every modern Scala j-s-o-n library uses type classes for serialization. You write case class user with name and age, and get a j-s-o-n codec by importing the derivation machinery.
+
+When you see a method signature with a using parameter list, or in Scala 2 code an implicit parameter, the question to ask is — what is the contract this method is asking the compiler to fulfill.
+
+Scala 2 to Scala 3 quick reference.
+
+If you read a Scala 2 codebase — and you will, because Spark and most of the existing ecosystem is Scala 2 — here is the keyword translation.
+
+Scala 2 implicit def of dot dot dot, taking an implicit parameter — Scala 3 def of dot dot dot, taking a using parameter. Scala 2 implicit val int-show colon show of integer — Scala 3 given show of integer. Scala 2 implicit class string-ops wrapping a string with a shout method — Scala 3 extension on string with shout. Scala 2 implicitly of square bracket ordering of integer — Scala 3 summon of square bracket ordering of integer. Scala 2 implicit conversions — Scala 3 given conversion of a and b plus the language import.
+
+The mechanics are the same. The keywords are clearer. Spark code you read will use the left column.
+
+What is next.
+
+You have type classes, extension methods, and the context-parameter machinery. These are the features that let modern Scala libraries feel cohesive — derive a j-s-o-n codec from a case class, register an encoder with Spark, write a generic sort that picks up the right ordering automatically.
+
+Notebook nine puts it all together with the runtime model — future, promise, and execution context for concurrent computation. The try-catch story for exception handling. And the using resource-management construct for files, connections, and other things that need closing. The final piece of the everyday Scala toolkit before the track moves on to applied uses.

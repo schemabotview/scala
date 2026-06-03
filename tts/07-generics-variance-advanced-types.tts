@@ -1,0 +1,147 @@
+Generics, variance, and advanced types.
+
+What is covered. This is the type-system notebook. It is the deepest material in the track and the part of Scala that most distinguishes it from its neighbours. Most working Scala does not require you to write the advanced bits — but reading library code, Spark source, or any deep abstraction will be opaque without them.
+
+The agenda. Generics — type parameters, the workhorse for writing code that works for any type. Generic methods, generic classes, generic traits. Upper and lower bounds. Variance — plus, minus, and unannotated. The three variance positions — producer, consumer, and invariant. The rule of thumb and the function-one example that makes it click. Type erasure — what the java virtual machine forgets at runtime, and the class-tag escape hatch. Opaque types — Scala 3's zero-runtime-cost nominal wrapper. Intersection types written with the ampersand operator. Union types written with the pipe operator. Match types — types that compute, conditional on other types. Structural types — duck typing at the type level, behind a feature flag. Self types — the this-colon-x declaration, used for the cake pattern and in Spark traits. Path-dependent types, briefly. And reading the harder Scala signatures — a quick translation pass through some standard-library examples.
+
+Generics — type parameters.
+
+A generic method, class, or trait declares one or more type parameters in square brackets, and uses those parameters in its signatures. The compiler instantiates the parameters at the call site — once with integer, once with string, once with whatever — without you writing one version per type.
+
+The shape. Def identity, with type parameter a in square brackets, taking x of type a, returning a, body just x. Def first, with two type parameters a and b, taking a pair of a and b, returning a. Class box, with type parameter a, taking val value of type a. Trait container, with type parameter a, with a get method returning a.
+
+The convention. Single capital letters — a, b, t, k, v — for type parameters. A for a single payload. K and v for map keys and values. T from java's tradition. R for return when distinguishing from t. The names are just for readability — pick anything you like.
+
+In code, picture def identity. Identity of forty-two returns forty-two, with a inferred as integer. Identity of the string scala returns scala, with a inferred as string. Identity of a list returns the list with a inferred as list of integer. Class box of type a, with val value of a, and a method show returning an s-string. Int-box of ten, str-box of hello — both print their boxed values. Trait container of type a, with abstract get returning a and is-empty returning boolean. Class single of a, taking v, extends container of a, implementing get as v and is-empty as false.
+
+Upper and lower bounds — constraining type parameters.
+
+By default, a type parameter a can be replaced by any type at all. Bounds let you constrain that.
+
+Upper bound, written a less-than colon bound, means a must be a subtype of bound. Inside the method, you can call any method bound has. Lower bound, written a greater-than colon bound, means a must be a supertype of bound. Less common; mainly shows up in variance escape hatches, covered next.
+
+Bounds are the type-level equivalent of this only makes sense for things that can do x. Without a bound, the compiler does not know that your a has, say, a dot name method.
+
+In code, picture trait named with abstract name returning string. Class person taking val name extends named. Class animal taking val species and val name extends named. Then def announce, generic over a less-than colon named, taking a thing of type a, returning a string, body uses thing dot name. The bound is what lets the body call dot name. Without the bound, this would not compile. Announce of a person works. Announce of an animal works. Lower bound — def widen, generic over a greater-than colon person, taking a person, returning a — lets you widen a person to any of its supertypes. Bind val wide of type named to widen of alice — a is inferred as named.
+
+Variance — does list of dog count as list of animal.
+
+Imagine a list of dog and a function that takes a list of animal. Can you pass the dogs to the function?
+
+This question is what variance answers. There are three possible answers, and each one is a property of the type constructor — like list, option, function-one — not of the elements.
+
+Covariant. List of dog is a list of animal. Marked with a plus sign on the type parameter declaration. Contravariant. Function of animal is a function of dog. Note the flip. Marked with a minus sign. Invariant. Neither direction works. Default, no annotation.
+
+The Scala standard library marks list, option, try, future as covariant on their payload. Function-one is contravariant on its parameter and covariant on its return. Mutable collections like array-buffer are invariant.
+
+Why does variance matter? Because the answer changes which method calls type-check. Get this wrong and you get a confusing error about a covariant or contravariant position.
+
+In code, picture three classes — animal, dog extending animal, puppy extending dog. Then class cov-box with a plus on the type parameter — covariant container. Cov-box of dog is also a cov-box of animal. You can assign a dog-box to an animal-box val — works. Print the value's name. Class inv-box with no annotation — invariant container. Cov-box of dog is not an inv-box of animal — does not compile. Then a contravariant consumer — trait printer with a minus on the type parameter. A printer of animal can be assigned to a printer of dog val — works. Call print on a dog and it prints.
+
+The producer-consumer rule of thumb.
+
+The variance choice for a type parameter follows a simple rule, sometimes called producers extend consumers super in the java world, or simply the producer-consumer rule.
+
+If the type parameter only appears in return positions — methods produce values of type a — make it covariant with the plus annotation. If the type parameter only appears in parameter positions — methods consume values of type a — make it contravariant with the minus annotation. If it appears in both, leave it invariant.
+
+The standard-library examples. List with a plus a — has head returning a, which produces, and no method takes an a as input on an immutable list. So covariant. Function-one with minus a plus b — apply takes a and returns b. A is consumed, b is produced. So a is contravariant, b is covariant. Array-buffer of a — has apply returning a, which produces, and append taking a, which consumes. So invariant.
+
+This rule is not just a convention. The compiler enforces it. If you mark a type parameter plus a and then write a method that takes an a as input, the compiler rejects it with covariant type a occurs in contravariant position.
+
+In code, picture function-one in action. Function-one of minus a plus b means you can use a function-one of animal and dog wherever a function-one of dog and animal is expected — input narrowed, output widened. Val animal-to-dog of type function-one of animal and dog equals a lambda from animal to dog. Then val dog-to-animal of type function-one of dog and animal equals animal-to-dog — substitutable. The reasoning. On input, any dog is an animal, so any caller passing a dog can be served by a function that accepts the wider animal. On output, any dog is an animal, so any caller expecting an animal back is happy with a dog.
+
+Lower bounds on covariant type parameters.
+
+A method with a covariant type parameter cannot take that parameter as an input — that would put a covariant a in a contravariant position. But sometimes you legitimately want to. The standard workaround is to introduce a fresh type parameter with a lower bound.
+
+Picture class cov-list of plus a with a prepend method taking a fresh type parameter b greater-than colon a, taking an x of type b, returning a cov-list of b. The new parameter b is a supertype of a — when you prepend a b to a list of a, you get a list of b. This is exactly what immutable list's double-colon does in the standard library.
+
+In code, picture a simplified immutable list with the same variance pattern as scala dot list. Sealed trait my-list of plus a, with prepend taking b greater-than colon a, taking x of b, returning my-list of b — body cons of x and this. Case class cons of plus a with head and tail. Case object my-nil extends my-list of nothing.
+
+A list of dog. Prepending an animal to a list of dog gives a list of animal. Define names recursively over my-list of animal — case cons of a, rest gives a dot name cons names of rest. Case my-nil gives nil. Call names of animals, you get the names list.
+
+Type erasure — what the java virtual machine forgets at runtime.
+
+Scala generics, like java generics, are erased at compile time. The java virtual machine sees list at runtime, not list of integer. The type parameter is purely a compile-time check.
+
+The practical consequence. A pattern match cannot distinguish list of integer from list of string at runtime. The compiler warns you when you try.
+
+The escape hatch is type-tag or class-tag. Runtime tokens that carry type information past erasure. Spark uses class-tag extensively for serialization, which is why so many Spark methods carry an implicit class-tag parameter.
+
+In code, picture this. Trying to match case underscore colon list of integer arrow gives the warning — the type test for list of integer cannot be checked at runtime. What you can check is the outer type, list, not the inner parameter. Case underscore colon list of question-mark arrow works. Is-list of a list of integer is true. Is-list of a list of string is also true — same answer. Is-list of a non-list is false. Class-tag — def new-array-of, generic over a with a context bound on class-tag, taking a size and a default, returning array of a. Inside, new array of size, initialize all positions to default. Call new-array-of of integer, three, ninety-nine — and you get an integer array. Of string, two, hi — a string array. The class-tag is what makes the new array call work past erasure.
+
+Opaque types — zero-cost nominal wrappers.
+
+A type alias from notebook two does not create a new type. Type user-i-d equals string makes the two interchangeable. A class user-i-d with val raw of string is a different type but allocates a wrapper object per instance.
+
+Opaque types are Scala 3's middle ground. They are a new nominal type at compile time — the compiler refuses to mix them with the underlying — but at runtime they are exactly the underlying type, with no boxing.
+
+The shape. Declare with opaque type inside an object. Outside that object, the type is opaque — you cannot see through it. Inside the object, you can convert freely. Define a constructor, often apply, and any allowed operations as members of the object.
+
+In code, picture an object ids with two opaque types — user-i-d and account-i-d, both backed by string. Inside ids, define companion objects with apply factories — user-i-d of a raw string gives a user-i-d. Then extension methods for raw to convert back. Import ids dot star. Bind u to user-i-d of u dash zero zero one, a to account-i-d of a dash zero four two. Outside ids, these are distinct types — process-user takes a user-i-d and accepts u but rejects a. The compiler enforces the separation. At runtime, both are just string — no overhead. U dot is-instance-of of string returns true.
+
+Intersection types — a ampersand b.
+
+A ampersand b is the type of values that are both an a and a b. Replaces the older a with b in type position. Useful for combining the surface of two traits without naming the combination.
+
+In code, picture trait named with name, trait aged with age. Then def describe taking a person of type named ampersand aged, returning a string. Class member, taking val name and val age, extending named, aged. Describe of member of ganesh, thirty prints the combined fields.
+
+Union types — a pipe b.
+
+A pipe b is the type of values that are either an a or a b. Replaces a common Scala 2 trick where you had to invent a sealed trait or use either to express one of these two unrelated types.
+
+You destructure a union type by pattern matching.
+
+In code, picture def stringify taking x of integer pipe string. Match — case n colon integer arrow integer dollar n. Case s colon string arrow string dollar s. Stringify of forty-two prints int forty-two. Of hello prints str hello. Composable — works in collections, in function returns, anywhere. Val mixed of list of integer pipe string equals a heterogeneous list. Mixed dot map of stringify gives a list of strings.
+
+Match types — types that compute.
+
+A match type is a type-level conditional. Given an input type, it computes an output type by matching on the shape of the input. The shape mirrors a value-level match, but at the type level.
+
+This is the deepest part of the type system you are likely to read about in everyday Scala. The standard library uses it in tuple operations and i-array. You almost certainly do not need to write one — but recognising the shape lets you read Scala 3 library signatures.
+
+In code, picture type element of t equals t match — case string arrow char. Case array of small-t arrow small-t. Case iterable of small-t arrow small-t. At the type level, the compiler computes element of string is char, element of array of integer is integer, element of list of string is string. You can prove it works with typed vals — val a of element of string equals single-quote x single-quote, a char. Val b of element of array of integer equals forty-two, an integer. Val c of element of list of string equals hi, a string. Print all three.
+
+Structural types — duck typing at the type level.
+
+A structural type describes the shape of an object — what methods it must have — without naming a class or trait. The compiler then accepts any value with that shape.
+
+In Scala 3, structural types require importing scala dot language dot reflective-calls or using the select-dynamic mechanism, and they use reflection at the call site, which is slow. Use them sparingly. Mentioned here only so the syntax does not surprise you.
+
+The shape — def close-it, taking a resource of structural type with a close method returning unit, body just calls resource dot close.
+
+Reach for a trait plus extension or a type class before reaching for structural types.
+
+Self types — this colon x.
+
+A self type declares this trait requires that any class mixing it in must also be an x. Different from extends x because the trait does not actually inherit x — it just demands the implementation provides one.
+
+The classic use is the cake pattern, where dependencies between modular components are expressed as self types. You will see it in older Scala codebases and in some library internals. In Spark, s-q-l context uses self types to refer to spark context.
+
+In code, picture trait database with abstract query returning a list of string. Trait user-service with self type this colon database arrow — any class mixing in user-service must also be a database. Def find-user takes an i-d and calls query, the inherited method from database. Class app extends database, user-service, implementing query. Call find-user — it works through the self-type guarantee.
+
+Path-dependent types — briefly.
+
+Types can be members of values, not just members of classes. The resulting type is a path-dependent type — its full name includes the value it lives on.
+
+Picture class outer containing class inner. Val a equals outer, val b equals outer. Val x of a dot inner equals a dot inner. But val y of b dot inner equals a dot inner does not compile — a dot inner and b dot inner are distinct.
+
+This is exotic but real — Spark's dataset of t exploits it in places. Mentioned for recognition; you will almost never write a path-dependent type yourself.
+
+Reading harder Scala signatures.
+
+The standard-library signature for future dot flat-map looks like this — def flat-map, with type parameter s, taking a function from t to future of s, then a second parameter list with using execution-context, returning future of s.
+
+Decoded. The s in square brackets declares a fresh type parameter, the result type of the chained future. The function from t to future of s is the chain step. The using execution-context is a second parameter list, providing the execution context implicitly. Notebook eight covers using. The return type is future of s.
+
+A more dramatic example from the cats library, traverse, generic over g of underscore with a context bound on applicative, then a and b, taking f-a of type f of a, then a second list with a function from a to g of b, returning g of f of b.
+
+G of underscore is a higher-kinded type parameter — g is itself a type constructor, like list or option. The colon applicative is a context bound — g must have an applicative instance available. We will meet context bounds and type classes in notebook eight.
+
+You do not need to write this kind of signature in everyday code. But you will read it, and the rules in this notebook are how you decode it.
+
+What is next.
+
+You now have generics, variance, the bounded type parameters that constrain them, and the Scala 3 shapes that go beyond — opaque types, intersection and union types, match types, structural and self types. This is the deepest type-system territory you are likely to encounter.
+
+Notebook eight takes one specific shape — context parameters via using and given — and shows what it enables. Type classes, extension methods, and the implicits machinery that replaces Scala 2's confusing implicit keyword. The features that let libraries like Spark register encoders, that let j-s-o-n libraries derive serializers automatically, and that make Scala's standard library feel composable.

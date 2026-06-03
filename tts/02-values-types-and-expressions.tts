@@ -1,59 +1,159 @@
-Welcome to notebook two. This is the language proper. We start at the smallest piece, which is how Scala 3 names a value, what type that value gets, and how those named values combine into the larger expressions that make up a program.
+Values, types, and expressions.
 
-There are three mental shifts to absorb here. The first shift is that immutability is the default. The keyword val, short for value, is the everyday binding in Scala. The keyword var, short for variable, is the exception. The second shift is that the compiler infers types you do not write. You can still write them out, and sometimes you should, but inference covers most of the surface. The third shift is the largest one. In Scala, if, while, and for are not statements. They are expressions. They return values. That single fact reshapes how the rest of the language is built.
+What is covered. This notebook walks through how Scala 3 names a value, what type that value gets, and how those named values combine into the larger expressions that make up a program. Val versus var. Lazy val. The type hierarchy from any down to nothing. Type inference and the three places you should still write the type explicitly. The numeric types and the silent gotchas that come from sitting on top of the java virtual machine's primitives. String and the three built-in interpolators. Boolean, char, and the strange residents unit, null, and nothing. Type aliases. The single biggest mental shift in this notebook, which is that if, for, and blocks are expressions that have a value. The one exception, which is while. Operators as method calls. And type ascription.
 
-Let us start with val and var. The keyword val binds a name to a value once. After the binding, the name cannot be reassigned. If you try to reassign it, the compiler stops you. The keyword var binds a name to a value but lets you reassign it later. So val is single assignment. Var is mutable assignment.
+Val versus var.
 
-The rule of thumb in Scala is straightforward. Reach for val first. Only switch to var when you have a clear reason, which is usually a hot loop counter, or a small piece of locally mutable state. Almost all of Spark's application programming interfaces are designed around immutable data, because immutability is what makes data safe to share across executors in a distributed system. When two threads or two machines look at the same value, immutability means they cannot disagree about what that value is.
+Two ways to name something in Scala. They look almost identical and behave very differently.
 
-Two things are worth registering about val. The first is that val is single assignment, not deep freeze. A val can point to a mutable collection. The binding cannot change, but the thing it points to can. We will explore that gap in detail in notebook four when we meet collections. The second thing is that the right hand side of a val is evaluated once, eagerly. The moment the line runs, the expression is computed and the name is bound to the result.
+A val is a single-assignment binding. Once given a value, the name cannot be re-pointed at a different value. This is the Scala default — reach for it first.
 
-Now let us talk about types. Every binding in Scala has a static type. Most of the time you do not write that type yourself. The compiler infers it from the right hand side of the binding. If you write val n equals 42, the compiler infers the type Int. If you write val pi equals 3 point 14, the compiler infers the type Double. If you write val name equals quote ganesh quote, the compiler infers the type String.
+A var is a mutable variable. The name can be reassigned to a different value over its lifetime. Use it deliberately when you actually need a counter, an accumulator, or a state machine — not as a reflex from another language.
 
-You can also write the type explicitly. The syntax is name, colon, type, equals, value. So you could write val n colon Int equals 42, or val pi colon Double equals 3 point 14. The compiler checks that the right hand side really is of the type you claimed.
+The bias is real. Idiomatic Scala uses val for the overwhelming majority of bindings. New code that reaches for var should make you ask — is there a way to express this as a transformation that produces a new value, rather than a mutation that updates an old one.
 
-When should you write the type explicitly? Three cases come up often. The first case is a public method or a value exported from a library. Writing the type documents the contract. It pins the type against accidental change. The second case is when the inferred type is wider or narrower than what you want. Writing the type forces the compiler to use your type. The third case is when the right hand side is non trivial and a reader benefits from seeing the type at the binding site. For local bindings inside a method body, leave inference to do its job. Less noise, faster to read.
+In code, picture two declarations. Val pi equals three point one four one five nine — this binding is locked. If you write pi equals three point one four on a later line, the compiler refuses, with the error reassignment to val. Var counter equals zero — this binding is mutable. You can write counter equals counter plus one twice and end up at two. But even with var, you cannot change the type. If you bind var n to ten, n is inferred to be an integer. You can later assign ninety-nine to it because that is also an integer. You cannot assign the string ten to it, because the type was fixed at the first assignment.
 
-Now the core types you will use daily. Scala's primitive numeric types compile down to java virtual machine primitives, which is to say they are as fast as java integers and floats. There are four integer types, distinguished by their width. Byte is eight bits. Short is sixteen bits. Int is thirty two bits. Long is sixty four bits. There are two floating point types. Float is thirty two bits. Double is sixty four bits.
+Two subtleties worth pinning down now, because both come back later.
 
-Two important defaults. An integer literal like the number forty two is inferred as Int. A floating point literal like three point one four is inferred as Double. To get a Long literal, you suffix it with a capital L. To get a Float literal, you suffix it with a lowercase f. Numeric literals also accept underscores as visual separators, so one million can be written as one underscore zero zero zero underscore zero zero zero. The compiler ignores the underscores.
+Val locks the binding, not the value it points at. If you bind a val to a mutable object — say a scala collection mutable array buffer, or a java array list, or a Scala array — the binding is fixed but the contents of the object can still change in place. We will see this concretely when we meet array in notebook four. The takeaway. Immutability is a property of the type, not of the keyword val.
 
-Beyond the numbers, you have Boolean, which has just two values, true and false. You have Char, which is a sixteen bit unsigned integer carrying a UTF sixteen code unit. Use single quotes for a Char literal, like the letter g in single quotes. Double quotes always mean String. Speaking of String, it is not a Scala primitive. It is java's String class, reused directly. So every method you remember from java strings is available on a Scala String.
+The right-hand side is evaluated immediately. When you write val x equals expensive of parentheses, expensive of parentheses runs at the point of the val declaration, not the first time you read x. If you want lazy evaluation, that is lazy val, which is the next section.
 
-The last special type is Unit. Unit has exactly one inhabitant, written as a pair of empty parentheses. Unit is what a method returns when it returns nothing useful. It is Scala's equivalent of java's void, but unlike void it is a real type, so you can write it down, ascribe it, and pass it around.
+Lazy val — computed at most once, on first read.
 
-Now a small but useful tool called type ascription. Sometimes you want to tell the compiler exactly which type to use for an expression, often to upcast to a parent type or to pin a numeric width. You write the expression followed by a colon and then the type. For example, the literal forty two written with ascription as forty two colon Long tells the compiler to treat forty two as a Long, not as the default Int.
+A lazy val is a binding whose right-hand side is not evaluated when the declaration is reached. It runs the first time the name is actually used, and the result is then cached for every subsequent read.
 
-Ascription with a colon is checked at compile time. The compiler verifies that the expression really is of that type, or that it can be widened to that type. Compare that to a different operation called as instance of, which is a runtime cast. A runtime cast bypasses the compiler's check and can throw an exception at runtime. Prefer ascription. Reach for as instance of only when interop with java reflection forces your hand.
+Two common reasons to reach for it. The computation is expensive and might not be needed at all in some code paths. Or the computation depends on something that is not ready yet at declaration time but will be later.
 
-Now we arrive at the most important idea in this notebook. In Scala, almost everything is an expression. To explain what that means, let me contrast it with the C family of languages, which includes java, C plus plus, and C sharp. In those languages, code is a sequence of statements. A statement is a thing you do, not a thing that has a value. An if is a statement. It does not return anything. A while is a statement. A block of curly braces is a statement.
+Behind the scenes the compiler generates a private field for the cached result and a thread-safe synchronized initialization block. So lazy val is safe to share across threads, at the cost of a small first-access overhead.
 
-In Scala, almost everything is an expression. An expression is code that evaluates to a value of some type. A block returns its last expression. An if returns whichever branch was taken. A for, when written with the yield keyword, returns a collection. Statements still exist, but they are confined to two narrow cases. Assignments to a var evaluate to Unit. While loops evaluate to Unit. Everything else gives you back a value you can bind to a name, return from a method, or pass on to another function.
+In code, picture two declarations side by side. One val called eager, of type integer, runs a side effect that bumps a counter and prints the word eager evaluated, and returns forty-two. One lazy val called lazy-one, of type integer, does the same kind of work — bumps the counter and prints lazy evaluated — but returns ninety-nine. Then on the next line, you print the side-effect counter, which is one. Only eager ran. The lazy val has not been touched. Then you print the value of lazy-one for the first time, and you see the side-effect output appear, and then the value ninety-nine. Then you print lazy-one a second time, and you see only the value, no side effect — it was cached. Finally the side-effect counter reads two.
 
-Let us see what that looks like in practice. Take an if expression. Because if and else returns a value, you assign the result directly to a name. There is no need for a ternary operator like the question mark colon syntax in java, because plain if and else already returns a value. Scala 3 introduced the keyword then, which sits between the condition and the first branch. So you write, val parity equals if n modulo two equals zero then the string even else the string odd. The variable parity ends up bound to one of the two strings. Its type is inferred as String.
+The type hierarchy.
 
-The brace style with parentheses around the condition still works for backward compatibility, but Scala 3's idiomatic form drops the parentheses and uses the then keyword.
+Every value in Scala is an instance of a type, and every type sits somewhere in a single rooted hierarchy. Knowing the shape of that hierarchy explains a lot of subsequent behavior — what the compiler accepts, what null does, what an empty list's element type is, why throw can appear in a position that expects a value.
 
-A subtle but important detail. If you omit the else branch, the type of the if expression becomes the least upper bound of the then branch and Unit. In almost every case that least upper bound is the universal type Any, which is essentially useless. So in practice, any if that is supposed to produce a value must have an else.
+Picture a tree with one root at the top called any. Any has two children. The first child is any-val, which is the parent of every value type backed by a java virtual machine primitive — integer, long, double, boolean, char, byte, short, float, plus the strange one-value type unit. The second child is any-ref, which is the parent of every reference type — every class, including standard library types like string, list, and map, plus every class you define yourself. Any-ref is exactly java lang object under the hood.
 
-Next is the block expression. A block, written either with curly braces or with significant indentation, is itself an expression. Its value is the value of the last expression inside it. So if you write a block that binds two local values and then computes a result, the block's value is that final computed result, and you can assign that to a name on the outside.
+Below the tree, two more types sit specially. Null is the type of the literal null. It is a subtype of every reference type. You can assign null to a string — though you should not — but you cannot assign null to an integer, because null is not a subtype of any-val. Nothing is the bottom of the entire hierarchy. It is a subtype of every type, including the value types. Nothing has no values. It is the type of expressions that never return, like throw of a new exception. We will use this idea in notebook six when we meet option.
 
-Two notes on blocks. First, names bound inside a block are local. They go out of scope when the block ends, either at the closing brace or at the dedent. Second, a block with no expressions has type Unit. A block that ends with an assignment also has type Unit, because assignments themselves return Unit.
+In code, picture three vals bound to any. One holds the integer forty-two. One holds the string forty two. One holds a list of three integers. All three type-check, because every value in Scala is an any. Then picture a function called crash-and-burn that takes a message and returns integer. Inside, the body is just throw of a new runtime exception. The compiler is happy with this, because throw has type nothing, and nothing is a subtype of integer. So an expression that never returns satisfies any declared return type. Then picture a val called maybe-name, declared as string, assigned to null. The program compiles, prints the literal text null, and any method call you make on it crashes with a null pointer exception. Idiomatic Scala uses option, from notebook six, instead.
 
-Now, the holdout. While is the one structure in Scala that is purely a statement. It returns Unit. It exists for hot inner loops where mutation is the most efficient option, but in idiomatic Scala you rarely need it. The Scala 3 syntax for while uses the keyword do between the condition and the body. So you write, while i less than three do, and then on the next line, indented, you write what the loop body should do.
+Type inference — what the compiler does for free.
 
-Why is while a statement and not an expression? Because to make while return a useful value, the loop would either need to accumulate something, which is what fold and for yield are for, or it would need to commit to mutation, which is what var already gives you. Scala draws the line. If you need a value back from a loop, use for yield. If you need imperative mutation, use while.
+Scala is statically typed, but the compiler does most of the typing work for you. For a val, the compiler reads the right-hand side, computes its type, and uses that as the type of the binding. No annotation needed.
 
-Speaking of for, let us preview it briefly. The for expression in Scala has two forms. The first form is for, then a generator clause like i taking values from one to three, then the keyword do, then a body. This form runs the body once per element, for its side effect, and the whole for expression evaluates to Unit. The second form is for, then a generator clause, then the keyword yield, then an expression. This form transforms each element of the source collection and gathers the results into a new collection. So if you write for i taking values from one to five yield i times i, you get back an indexed sequence containing the numbers one, four, nine, sixteen, twenty five.
+Most of the code you read and write will look like that — no explicit types in sight. You write val a equals forty-two, and the compiler infers integer. Val b equals three point one four, inferred double. Val c equals the string scala, inferred string. Val d equals list of one two three, inferred list of integer. Val e equals the tuple one, the string one, one point zero, inferred as a three-tuple of integer, string, double.
 
-The yield form is the one you will reach for constantly in idiomatic Scala. Pull elements out of a collection, transform each one, get a new collection back. Internally, for yield is syntactic sugar over the methods map, flatMap, and withFilter. We will desugar it step by step in notebook five, when we cover collection operations.
+But there are three places where you should write the type explicitly even when inference would succeed.
 
-One more flavour of binding worth knowing now. The lazy val. A lazy val postpones evaluation of its right hand side until the first time the name is actually read. After that first read, the computed value is cached, so subsequent reads are instant. Lazy val is how you defer expensive work until it is genuinely needed. It is also how you break otherwise circular initialisation between two values that depend on each other.
+On public method signatures. A method's parameter and return types are part of its contract. Hide the types and a downstream change to the body silently changes the type the world depends on. Always annotate the return type of a def that other code calls.
 
-Use lazy val sparingly though. Laziness can hide where work actually happens in your program. When a bug appears, you may have to chase the laziness chain back to find out which read triggered the original computation. Useful, but a debugging cost when overused.
+When inference picks something wider than you intended. A common one. Val xs equals list of one, two point zero, the string three — the compiler infers a wide upper bound, almost never what you wanted. Writing val xs colon list of any equals the same expression makes the intent explicit. Or better, restructure to avoid the heterogeneous list.
 
-Let us close with a small composition that uses everything from this notebook. Take a score, say seventy three. Compute a grade, where the grade is built inside an outer block. Inside that outer block, you bind a local val called letter, which is itself the value of an if, else if, else if, else expression that chooses one of A, B, C, or F based on the score. After binding letter, the outer block's final expression is an interpolated string that combines the score and the letter into a sentence. That interpolated string is what the outer val, called grade, binds to.
+When the right-hand side is recursive or mutually recursive. Recursive defs need a return type annotation to break the inference cycle. Without it, the compiler errors with recursive method needs result type.
 
-Notice three things about that composition. First, the outer val grade equals binds the value of the block, which is the final interpolated string. Second, the inner val letter equals if and else binds the value of the if chain. Third, nothing was reassigned. No var. No early returns. The shape is, name a value, derive the next value from it, return the last one. That is the rhythm of idiomatic Scala.
+In code, picture three examples. One — a public method called normalise-email, taking a raw string, returning string, body trims the raw input and lowercases it. Two — a recursive method called factorial, taking n of type long, returning long, body is the standard if n less than or equal to one then one, else n times factorial of n minus one. Without the return type annotation, this would not compile. Three — a method called stats, taking a list of integer, returning a tuple of integer and double, body binds total to the sum and mean to total divided by length, and returns the pair. The local vals inside the body do not need type annotations.
 
-Now that you can name values and combine them into expressions, notebook three moves up one level. Functions and methods. There you will see how Scala turns the lambda calculus idea of functions as values into something you can actually pass to map, return from another function, and store in a collection. That building block is what every later notebook in this track depends on.
+The honest rule. Let inference handle local vals in method bodies, but annotate every public-facing signature.
+
+The numeric types.
+
+Scala's numeric types are thin wrappers over java virtual machine primitives. Their sizes and ranges are exactly what the java virtual machine provides.
+
+Byte is eight bits, ranging negative one twenty eight to one twenty seven. Short is sixteen bits, with the corresponding wider range. Integer is thirty-two bits, ranging roughly plus or minus two point one billion. This is the default for an integer literal — when you write forty-two, you get an integer. Long is sixty-four bits, ranging roughly plus or minus nine point two quintillion. To write a long literal, add the suffix capital L. Float is thirty-two-bit single-precision i-e-e-e seven fifty-four floating point — the suffix lowercase f. Double is sixty-four-bit double-precision floating point — the default for decimal literals. Big-int is arbitrary precision, unbounded but slower and on the heap, written as big-int of a quoted string. Big-decimal is arbitrary precision decimal, with exact decimal arithmetic, also written as big-decimal of a quoted string.
+
+Three things you have to remember when working with these.
+
+Default literal types. An integer literal like forty-two is an integer, not a long. A decimal literal like three point one four is a double, not a float. Add the suffix capital L or lowercase f to override.
+
+Overflow is silent. Adding past the maximum of an integer wraps around to a large negative number. The compiler will not warn you. Reach for long when the magnitudes can grow, or big-int when they can grow without bound.
+
+Floating point is not decimal. Zero point one plus zero point two produces zero point three zero zero zero zero zero zero zero zero zero zero zero zero zero zero zero four in a double, exactly as it does in every other i-e-e-e seven fifty-four language. For money or any context where exact decimal arithmetic matters, reach for big-decimal.
+
+In code, picture this. Bind val almost-max to integer dot max value. Print it, you see two billion one hundred forty seven million. Add one and print again, you see the same magnitude but negative — it wrapped around without error. Promotion is one-directional. A small integer widens to long or double automatically. A long does not narrow to integer automatically — you have to call dot to-int explicitly. And the floating-point reality. Print zero point one plus zero point two and you see the long tail. Construct two big-decimals from quoted strings, add them, and you see exactly zero point three.
+
+String and the built-in interpolators.
+
+A string in Scala is a java lang string — exact same class, exact same methods. There is no separate Scala string type. What Scala adds is a small set of string interpolators — prefixes you put before the opening quote that change how the literal is parsed.
+
+The three built-in ones. The letter s before a string splices expressions with dollar name and dollar braces. The letter f before a string splices with print-f-style format specifiers attached. The letters r-a-w before a string splices like s, but does not process backslash escapes, so backslash-n stays as two characters.
+
+There is also the triple-quote form, three double quotes opening and closing, for multi-line strings that contain quotes, backslashes, and newlines without any escaping. It composes with the interpolator prefixes — you can write s, three double quotes, content, three double quotes, and it just works.
+
+In code, picture a val name bound to the string ganesh and a val score bound to ninety-two point three four five. Then s of hello dollar name prints hello ganesh. S of length equals dollar braces name dot length prints length equals six. F of score colon dollar score percent dot two f prints score colon nine two point three five — rounded to two decimal places. F of name colon dollar name percent minus ten s, pipe, score colon dollar score percent six dot two f — that produces a padded line with the name left-justified in a ten-character field and the score in a six-character field with two decimals. R-a-w of line one backslash n line two prints the literal characters line one backslash n line two, no newline. S of the same expression prints line one, newline, line two.
+
+Triple-quoted multi-line strings are useful for s-q-l queries and embedded text. You bind a val sql to a triple-quoted string starting with select id comma amount, on the next line pipe from transactions, on the next line pipe where customer equals quote dollar name quote. The pipes are margin markers. Then you call dot strip-margin on the whole expression, and the leading whitespace up to and including the pipe is stripped off each line. The default margin character is pipe; you can pass a different one if your string contains pipes.
+
+What interpolators compile to. An interpolator is a method call on the string-context class. When you write s of hello dollar name, the compiler rewrites it to string-context of the parts before and after the splice, followed by dot s of the spliced value. This means interpolators are not magic — you can write your own by extending string-context. Notebook eight revisits this.
+
+Boolean, char, unit, null, nothing.
+
+The non-numeric value types and the strange residents at the edges of the hierarchy.
+
+Boolean is true and false. Same as java's boolean, backed by a one-byte primitive.
+
+Char is a sixteen-bit unsigned integer interpreted as a u-t-f sixteen code unit. Written with single quotes — for example, single quote, a, single quote, or single quote, backslash n, single quote, or single quote, backslash u zero zero e nine, single quote. Because it is sixteen bits, characters outside the basic multilingual plane — most emoji, some chinese-japanese-korean extensions — require two chars to represent, a surrogate pair. Practical consequence. The length of a string containing a single emoji is two, not one. For real unicode handling, work with string and use code-point methods.
+
+Unit is the type with exactly one value, written as empty parentheses. Used as the return type of methods that exist for their side effects. Equivalent to java's void, except unit is a real type you can write down.
+
+Null is the type of the literal null. Subtype of every reference type. Modern Scala 3 setups can opt into explicit nulls with the compiler flag dash y explicit-nulls, which makes null no longer assignable to a string without an explicit nullable type. We will recommend option, from notebook six, instead — in every situation where you would otherwise reach for null.
+
+Nothing is the bottom type. No values. The inferred type of throw, of the standard placeholder triple-question-mark for not implemented yet, and of an option of nothing in particular. Anywhere an expression of type nothing is used, the compiler accepts it as any type — because nothing is a subtype of everything.
+
+In code, picture a boolean val flag set to true, then printing the negation of flag and false, which is false. Picture the char val letter set to single-quote a single-quote, then printing the length of a string containing one emoji, which prints two — one emoji, two u-t-f sixteen code units. Picture a unit method called log, taking a message, printing it with a prefix. Picture a val nothing-value bound to empty parentheses, the sole inhabitant of unit. Picture a method called not-done-yet, returning string, with body the triple-question-mark. This throws a not-implemented error when called, but the compiler is happy because the triple-question-mark has type nothing.
+
+Type aliases.
+
+A type declaration gives a name to an existing type. It does not create a new type — the alias and the original are interchangeable everywhere.
+
+Two reasons to use them. Readability. A repeated complex type — say map of string to list of tuple of integer and double — becomes one named thing. Encoding intent. A user-i-d is conceptually different from a plain string, even when its representation is identical. The alias signals that.
+
+When you need real nominal separation, where the compiler refuses to let you pass a plain string where a user-i-d is expected, reach for an opaque type or a value class. Notebook seven covers both.
+
+In code, picture type user-i-d equals string, and type customer-map equals map of user-i-d to list of string. Then a function called lookup that takes a customer-map and a user-i-d, returning a list of string. Inside, it calls map dot get-or-else with the i-d and an empty list. You build a sample customer-map with two users mapped to invoice lists, and lookup returns the right list. Then to make the transparency visible, you bind a raw string to the value u one, then bind an i-d of type user-i-d to that raw string. No conversion is needed. The comparison i-d equals raw is true — they really are the same type at runtime.
+
+The big shift — almost everything is an expression.
+
+In imperative languages like python or java, if is a statement. It controls flow but does not have a value. To get a value out, you assign inside both branches.
+
+In Scala, if is an expression. It evaluates to a value, and you bind that value with a val. The same is true for for-yield, for block expressions, and for pattern matching, which we will meet in notebook six.
+
+This is a small mental shift with large downstream consequences for how Scala code reads. You stop writing — do this, then assign that — sequences. You start writing — the value of this is the result of choosing between these alternatives.
+
+The one big exception is while. It is a statement-only loop that always evaluates to unit. We will see that next.
+
+In code, picture this. Val score equals seventy-three. Val grade of type string equals an if-else-if chain — if score greater than or equal to ninety then the string a, else if greater than or equal to seventy-five then b, else if greater than or equal to sixty then c, else f. Print grade and you see c. Picture a for-yield. Val squares of type list of integer equals for n drawn from list of one through five, yield n times n. Print squares and you see one, four, nine, sixteen, twenty-five. Picture a for-yield with a filter. For n drawn from the same list, with the guard if n modulo two equals zero, yield n times n. Print and you see four and sixteen. Picture a block. Val area equals a block containing val r equals three, val pi equals three point one four one five nine, and the last line pi times r times r. The value of the block is the value of its last expression. Print area and you see the area of the circle.
+
+While — the one statement-only construct.
+
+While, and its sibling do-while, is the exception that proves the rule. It always evaluates to unit. There is nothing useful to return from a loop whose only purpose is to iterate by side effect.
+
+Idiomatic Scala uses while sparingly — mostly in tight numeric loops where the alternative, a for-each call or a recursive call, would have measurable overhead. For everything else, reach for for-yield, or map, filter, fold, or recursion. Notebook four covers the higher-level alternatives.
+
+In code, picture a var i bound to zero. A while loop with condition i less than three, body that prints iteration i and increments i. Bind val loop-result to the while expression, and you see that loop-result is the empty parentheses, the sole unit value. The same thing, expression-style, without var or while, is a range zero until three followed by dot for-each printing each element. Or if you wanted a value out, map over the range producing an indexed sequence of strings, no mutation at all.
+
+Operators are method calls.
+
+There are no operator declarations in Scala. What looks like an operator — plus, minus, star, less-than, equals-equals, even the cons-cell operator double-colon and the list-concat operator double-plus — is a method call written in a special syntactic position.
+
+The rule. If a method takes one argument, you can call it without the dot and the parentheses. So one plus two is exactly one dot plus of two. And list one double-plus list two is exactly list one dot double-plus of list two.
+
+This is why Scala lets you define methods with symbolic names. A class can declare a def plus method, taking another instance, returning a new instance, and the call site uses it like a built-in operator. Notebook five will use this to add operators to domain types.
+
+In code, picture print line of one plus two — three. Print line of one dot plus of two — also three. Same thing. Print line of three dot less-than of five — true. Print line of list of one dot equals equals of list of one — also true, because list defines structural equality on its elements. Then picture a final class called money, with a primary constructor taking val cents of type long. Inside the class, def plus takes another money and returns a new money with the summed cents. Override def to-string returns an f-string formatting the dollars and cents. Bind val a to money of five hundred cents and val b to money of one hundred twenty-five cents. The expression a plus b uses the operator method you defined, and prints as dollar sign six point two five.
+
+Type ascription — expression colon type.
+
+A type ascription tells the compiler — evaluate this expression as this type. It does not change the runtime value. It changes how the compiler treats the value for subsequent inference.
+
+Three honest uses. Forcing widening. Val xs equals list of one, two, three is list of integer. Val xs equals the same expression, then colon list of any, is list of any. The runtime value is identical. Disambiguating overloaded methods. When two overloads differ only by argument type, ascribing the argument picks one. Signalling intent on a return. Inside a long block, an ascription on the final expression documents the type the block is expected to produce, and the compiler enforces it.
+
+In code, picture val ints of type list of integer equals list of one, two, three. Picture val anys of type list of any equals the same expression, then colon list of any. Both print as list of one, two, three. Then picture this — type ascription is not a cast. It only succeeds when the expression is already a subtype of the ascribed type. Val s of type string equals hello. Val a of type any equals s — that is implicit widening, always works. Val b of type any equals s colon any — explicit ascription, also works. But val c of type integer equals s colon integer — the compiler refuses, because string is not an integer.
+
+What is next.
+
+You now have the building blocks. How to name a value. What types are available. How literals widen and promote. How to splice expressions into strings. And the most important shift — that if, for, and blocks are expressions that have a value.
+
+Notebook three builds on this by treating functions the same way. A function is a value — you can pass it as an argument, return it from another function, store it in a list. You will meet def, the method form. The function-value form, written as parameter list, arrow, body. The difference between the two. And the syntactic features that make Scala's function-rich style readable — named arguments, default parameters, by-name parameters, currying, and partial application.

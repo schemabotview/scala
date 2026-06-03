@@ -28,15 +28,9 @@ Use `scala-cli` for quick REPL/scripts and `sbt` for multi-file projects.
 | 01 | Intro & Setup | `01-intro-and-setup.ipynb` | `01-intro-and-setup.wav` |
 | 02 | Values, Types & Expressions | `02-values-types-and-expressions.ipynb` | `02-values-types-and-expressions.wav` |
 | 03 | Functions & Methods | `03-functions-and-methods.ipynb` | `03-functions-and-methods.wav` |
-| 04 | Collections Essentials | `04-collections-essentials.ipynb` | `04-collections-essentials.wav` |
-| 05 | Collection Operations | `05-collection-operations.ipynb` | `05-collection-operations.wav` |
-| 06 | Classes, Objects & Traits | `06-classes-objects-and-traits.ipynb` | `06-classes-objects-and-traits.wav` |
-| 07 | Case Classes & Enums | `07-case-classes-and-enums.ipynb` | `07-case-classes-and-enums.wav` |
-| 08 | Pattern Matching | `08-pattern-matching.ipynb` | `08-pattern-matching.wav` |
-| 09 | Option, Try & Either | `09-option-try-either.ipynb` | `09-option-try-either.wav` |
-| 10 | Generics & Variance | `10-generics-and-variance.ipynb` | `10-generics-and-variance.wav` |
-| 11 | Givens & Extensions | `11-givens-and-extensions.ipynb` | `11-givens-and-extensions.wav` |
-| 12 | Advanced Types | `12-advanced-types.ipynb` | `12-advanced-types.wav` |
-| 13 | Futures & Concurrency | `13-futures-and-concurrency.ipynb` | `13-futures-and-concurrency.wav` |
-| 14 | Error Handling & Resources | `14-error-handling-and-resources.ipynb` | `14-error-handling-and-resources.wav` |
-| 15 | Scala for Spark | `15-scala-for-spark.ipynb` | `15-scala-for-spark.wav` |
+| 04 | Collections | `04-collections.ipynb` | `04-collections.wav` |
+| 05 | OOP — Classes, Traits, Case Classes & Enums | `05-oop-classes-traits-case-classes-enums.ipynb` | `05-oop-classes-traits-case-classes-enums.wav` |
+| 06 | Pattern Matching, Option, Try & Either | `06-pattern-matching-option-try-either.ipynb` | `06-pattern-matching-option-try-either.wav` |
+| 07 | Generics, Variance & Advanced Types | `07-generics-variance-advanced-types.ipynb` | `07-generics-variance-advanced-types.wav` |
+| 08 | Givens & Extensions | `08-givens-and-extensions.ipynb` | `08-givens-and-extensions.wav` |
+| 09 | Concurrency & Error Handling | `09-concurrency-and-error-handling.ipynb` | `09-concurrency-and-error-handling.wav` |

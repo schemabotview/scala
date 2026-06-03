@@ -1,59 +1,175 @@
-Welcome to the first notebook in this Scala 3 track. The goal of this session is small but solid. By the end of it you will know what Scala is, why it earns its place on the java virtual machine, how to install Scala 3 on your machine, and how to run your first lines of code in three different ways. Prior programming experience helps but it is not required. If you have written Python or Java, you will see familiar shapes here, just dressed in slightly different clothing.
+Intro and setup.
 
-Let us start with the simplest possible question. What is Scala. Scala is a statically typed, hybrid functional and object oriented language that runs on the java virtual machine. That single sentence is dense, so let us unpack it.
+What is covered. This notebook walks through what Scala actually is, where it sits next to Java, Python, and Kotlin, why we are choosing Scala 3 over Scala 2, the java virtual machine contract that the language compiles into, the seamless interop story with java libraries, when not to use Scala, installing the whole toolchain in one shot with a tool called coursier, and three on-ramps to actually run Scala code — the read eval print loop, the single-file runner scala-cli, and the multi-file build tool s-b-t. Then a quick stop on the two surface syntaxes Scala 3 offers, the comment conventions, and finally a preview of what Scala constructs you will see when you crack open the Apache Spark source code later in this track.
 
-Statically typed means every value has a type that the compiler knows at compile time. If you try to add a string and an integer, the compiler stops you before the program ever runs. This is the opposite of Python, where the same mistake only blows up at runtime when the offending line actually executes.
+What Scala actually is.
 
-Hybrid functional and object oriented means Scala is fluent in two paradigms. You can write classes and objects the way you would in Java. You can also write pure functions, pass them around as values, and chain transformations on collections the way you would in Haskell or in modern Python. Most real Scala code mixes the two on purpose. Classes model the nouns of your domain. Functions describe the verbs.
+Scala is a statically typed, hybrid functional and object-oriented language that targets the java virtual machine. Martin Odersky designed it at the swiss federal institute of technology in 2004 with one goal — keep the engineering pragmatism of java, the libraries, the java virtual machine, the tooling, and fuse it with the expressive power of m-l-family functional languages. The name is a contraction of scalable language — the same syntax should feel right for a five-line script and for a million-line distributed system.
 
-Runs on the java virtual machine means Scala compiles to the same bytecode Java compiles to. The same garbage collector, the same just in time compiler, the same threading model, and crucially the same ecosystem. Every Java library, every Kafka client, every Hadoop tool, every database driver on Maven Central is available to you the moment you start a Scala project. You inherit twenty five years of mature tooling for free.
+Four traits define Scala in one breath. First, it is statically typed but inference-heavy — the compiler catches type errors at build time, but you rarely write the types yourself because the compiler infers most of them. Second, functions are values — you pass them as arguments, return them from other functions, store them in collections, exactly like integers or strings. Third, immutable by default — val, which is short for value and is a single-assignment binding, is preferred over var, which is a mutable variable. Standard-library collections are immutable unless you explicitly import the mutable ones. Fourth, it runs on the java virtual machine — every java library on the central maven artifact repository is reachable from Scala with zero ceremony. Same classpath, same dot class files, same bytecode.
 
-Scala was created by Martin Odersky and his team at EPFL in 2004. The name is a contraction of the words scalable language. The idea was that the same syntax should let you write a five line script and a five million line system, with no rewrite required as your code grows. That ambition is what shaped the language.
+Why Scala — and where it sits next to its neighbours.
 
-Four traits define Scala in one breath. It is statically typed but inference heavy, which means the compiler catches type errors yet you rarely need to spell the types out yourself. Functions are values, which means you can pass them, return them, and store them in collections just like you would an integer. Immutable is the default. The keyword val, short for value, binds something that cannot be reassigned. The keyword var binds something that can. In idiomatic Scala you reach for val first and only use var when there is a clear reason. And finally it runs on the java virtual machine, so the entire Java ecosystem is part of your standard library.
+Three reasons people reach for Scala in 2026. The first is Apache Spark and big-data engineering. Spark itself is written in Scala. The native Spark ay-pee-eye, the optimizer internals, the tuning knobs — all expressed in Scala first. Python bindings come second. The second reason is type-safe domain modeling. Algebraic data types, exhaustive pattern matching, generics with variance, type classes — the type system encodes invariants that the compiler will enforce. Whole classes of bugs become unrepresentable. The third reason is the java virtual machine ecosystem with functional ergonomics — every java library, every kafka client, every hadoop tool, but you write the glue with map, filter, and pattern matching instead of c-style for loops.
 
-Now, why Scala in 2026. There are three reasons people pick this language today. The first is Spark and big data. Apache Spark itself is written in Scala. The native Spark application programming interface, the internals of the optimiser, the tuning knobs in the configuration system, are all expressed in Scala first. Python bindings exist, but they are bindings. The native shape of the system is Scala shaped.
+A quick comparison against the three neighbouring languages this user is likely coming from.
 
-The second reason is type safe domain modeling. Algebraic data types, pattern matching, and a powerful type system let you encode invariants the compiler will enforce for you. You can make illegal states unrepresentable. The compiler refuses to compile programs where a payment can be both pending and refunded at the same time. This is hard to express in mainstream languages, and Scala makes it natural.
+Versus java — same java virtual machine, far less ceremony. No public static void main, no getters and setters, no new keyword required, type inference for most locals, immutability as the default. The trade-off is some compile-time speed and some i-d-e refactoring depth, exchanged for expressiveness.
 
-The third reason is the java virtual machine ecosystem with functional programming ergonomics. You get every Java library plus map, flatMap, and pattern matching as first class citizens. For this learning track, the Spark connection is the centre of gravity. From here on, where it is natural, every notebook will point out the Scala feature being used inside Spark's own codebase.
+Versus python — static types catch errors before run, and the same code runs an order of magnitude faster on the java virtual machine than c python on a hot path. The trade-off is python's read eval print loop ergonomics and gentle learning curve, exchanged for a stricter compiler and a slower startup.
 
-A short word on versions. This track uses Scala 3, the version line that started in 2021. Its internal codename is Dotty. Scala 3 is a deep redesign of the language. The target is the same java virtual machine. The flavour is the same. But the type system underneath got cleaned up, and the surface syntax got much friendlier.
+Versus kotlin — both target the java virtual machine and both fix java's main pain points. Kotlin is the more conservative redesign — easy adoption from java, paired tightly with android and jetbrains tooling. Scala is the more ambitious one — a deeper type system, true pattern matching, type classes via given. Scala wins when domain modeling is the hard part. Kotlin wins when you want a smoother on-ramp from java.
 
-Two highlights you will feel immediately. The first is significant indentation. Scala 3 lets you express code blocks with indentation, the way Python does, instead of curly braces. Braces still work. You can choose per file. The second highlight is the new keywords given and using, which replace Scala 2's implicit keyword. Implicit was Scala 2's most powerful and also most confusing feature. Scala 3 rebuilt it with clearer keywords and clearer rules. You will meet given and using properly in notebook eleven.
+For this learning track the centre of gravity is the Spark connection. Every later notebook will, where natural, point out the Scala feature being used inside Spark's own codebase.
 
-If you ever land on a Stack Overflow answer that uses implicit val foo, that is Scala 2 vintage. The shape of the idea is unchanged. Only the keyword differs.
+Scala 3, not Scala 2.
 
-Let us spend a minute on what happens when you run Scala code. When you write a Scala source file, the compiler is a program called scalac. The compiler turns your source code into java virtual machine bytecode. That bytecode is exactly the same instruction set that Java compiles to. The java virtual machine then loads the bytecode, executes it, garbage collects unused memory, and uses its just in time compiler to optimise the hot paths in your program as it runs.
+This track teaches Scala 3 — the version line that landed in 2021. Its long incubation codename was dotty. Scala 3 is a deep redesign — same java virtual machine target, same flavour, but a cleaner type system, fewer footguns, and a much friendlier surface syntax.
 
-Two consequences are worth absorbing now. The first is that startup is not instant. The java virtual machine itself takes a moment to boot. For tiny one off scripts this feels slow. For long running services it disappears into the noise. The second consequence is that you inherit the java virtual machine's strengths. A mature garbage collector. A just in time compiler that gets faster the longer your program runs. And decades of mature profiling and observability tools.
+The changes you will feel immediately. Significant indentation — code blocks can be expressed with indentation the way python does, instead of curly braces. Braces still work; you pick one style per file. Given and using replace the old keyword implicit — Scala 2's most powerful and most confusing feature was rebuilt with clearer keywords. You will meet these in notebook eight. Enum is a first-class keyword — algebraic data types, which in Scala 2 required a sealed trait plus a handful of case class declarations extending it, now have a one-keyword form. Notebook five covers this. Extension methods — you can add methods to types you don't own without the old implicit class trick. Also notebook eight. And top-level definitions — you can declare a def or a val at the top of a file, with no enclosing object required.
 
-Now let us install Scala 3 and actually run something. The recommended installer is Coursier. Coursier is a single tool that fetches a compatible java development kit, the Scala 3 compiler, the interactive console, the scala command line interface, and the simple build tool, all in one go. On macOS you install Coursier with brew install coursier, and then you run cs setup. The cs setup command does the heavy lifting. It downloads a recent java development kit, sets up the scala command, and updates your path.
+If you stumble onto a stack overflow answer using implicit val foo or object main extends app, that is Scala 2 vintage. The shape of the idea usually carries over; only the keyword differs.
 
-After cs setup finishes, open a new terminal so the updated path takes effect. Then verify the install. Type scala dash dash version and you should see Scala code runner version three dot something. Type scala dash CLI dash dash version to confirm the single file runner is on your path. Type sbt dash dash version to confirm the build tool is too.
+One practical note. Most of the java virtual machine library ecosystem still publishes for Scala 2 point 13 as well as Scala 3. Scala 3 is binary-compatible with Scala 2 point 13 libraries at the bytecode level, so you can depend on a Scala 2 point 13 library from a Scala 3 project. The reverse — depending on a Scala 3 library from a Scala 2 project — does not work. Spark is the big exception you will care about. As of 2026, Spark still targets Scala 2 point 13, so when this track bridges to Spark you will be reading Scala 2 source code.
 
-Now, Scala gives you three on ramps for running code. Pick the one that matches the size of what you are doing.
+The java virtual machine context.
 
-The first on ramp is the interactive console, called the repple. The repple is for the question what does this expression do. It is the cheapest possible feedback loop. You type an expression. Scala evaluates it. Scala echoes back the result and the inferred type. You think. You type the next expression. The repple is where you build intuition.
+When you write Scala, the compiler — called scalac — turns your source into java virtual machine bytecode, the same instruction set java compiles to. The java virtual machine then loads that bytecode and executes it. Picture the pipeline this way. A file ending in dot scala goes through scalac and becomes a dot class file containing bytecode. The java virtual machine loads the class file, runs the garbage collector to manage memory, and uses the just-in-time compiler to optimize hot code paths at runtime. The output then prints or returns from your program.
 
-The second on ramp is the scala command line interface, written scala dash CLI. The scala command line interface is for a single file you want to keep around. You write your code in a file called something dot scala, and you run it with scala dash CLI run, followed by the filename. If your script needs a library, you add a special comment at the top of the file declaring the dependency, and the scala command line interface fetches it for you. This is the perfect tool for personal scripts and small experiments.
+Three consequences are worth absorbing now.
 
-The third on ramp is the simple build tool, spelled S B T. The simple build tool is for anything that has more than one file, or that you want to build, test, and package seriously. The simple build tool is what Apache Spark itself uses. It manages dependencies, runs your tests, compiles incrementally as you save files, and packages your application into a jar archive you can deploy.
+First, java virtual machine startup is not free. The java virtual machine itself takes a moment to boot — typically a few hundred milliseconds before your main method runs. For tiny scripts that feels slow. For long-running services it disappears into the noise. The scala-cli runner mitigates this for one-off scripts by reusing a warm java virtual machine where it can.
 
-Let us see each of these in action. Open the interactive console with the scala command. You will get a prompt that says scala greater than. From there, type print line, in quotes, hello scala three. The repple prints back hello scala three. Now type val name equals, in quotes, ganesh. The repple binds the name and echoes back the inferred type, which is string. Now type s, in quotes, hello dollar sign name. That returns the string hello ganesh. The lower case s prefix on the string is called a string interpolator. It tells the compiler that the dollar sign placeholders inside the quotes should be replaced with the values of the matching variables. When you are done, type colon q u i t to exit. Colon h e l p shows all the repple commands.
+Second, you inherit the java virtual machine's strengths. A mature garbage collector frees you from manual memory management. The just-in-time compiler watches hot code paths and recompiles them down to optimized machine code at runtime — so a method called a million times can end up faster in java virtual machine Scala than in ahead-of-time compiled c, in some shapes. The profiling and observability ecosystem — java flight recorder, async profiler, java mission control, visual v-m — all work on Scala bytecode unchanged.
 
-Three details worth registering from that session. First, val bound a value, and the repple knew its type without us writing it down. That is type inference in action. Second, the s prefixed string is a compile time feature, not a runtime function call. The compiler rewrites the interpolated string at compile time. There is no string formatting cost at runtime. Third, the colon prefixed commands are repple commands, not Scala expressions. They are how you talk to the repple itself.
+Third, you inherit the java virtual machine's footprint. A Scala process holds the java virtual machine in memory — typically tens of megabytes of resident set even for trivial programs. For a server that is invisible. For a command-line tool you ship to laptops, it's a real consideration. Graal v-m native image is the escape hatch when you really need ahead-of-time-compiled standalone binaries; it works with Scala but adds build complexity.
 
-Next, the scala command line interface. For anything longer than two lines you put the code in a file. Create a file called hello dot scala. Inside it, write at sign main, def hello, open paren, close paren, colon Unit equals, and on the next line, indented, print line, in quotes, hello from scala dash CLI. To run the file, type scala dash CLI run hello dot scala. The output is hello from scala dash CLI.
+Java interop — every j-a-r is yours.
 
-Two new shapes appeared in that example. The first is the at sign main annotation. The at sign main annotation marks an entry point. Whatever method carries this annotation becomes the program's main method. This replaces the older Scala 2 boilerplate where you had to extend a special trait. The second shape is the Unit return type. Unit is Scala's equivalent of void in Java or C. It is a real type, with exactly one inhabitant, written as a pair of empty parentheses. A method whose result type is Unit is a method you call for its side effect, not for its return value.
+Because Scala compiles to java virtual machine bytecode that looks indistinguishable from java's, any java library is automatically a Scala library. There is no foreign function interface, no binding layer, no wrappers needed.
 
-Now, the simple build tool. For a real project, the simple build tool gives you a directory layout, dependency management, incremental compilation, and a test runner. You will meet it properly in notebook fifteen when this track bridges to Spark. For now, the one command scaffold is enough. Type sbt new scala slash scala three dot g eight. That command pulls a template from the internet, asks for a project name, and creates a directory with the standard layout. There is a build dot sbt file at the root that holds your project configuration. There is a project subdirectory with build metadata. And there is a src subdirectory that contains main slash scala for production code and test slash scala for your tests. To compile and run the project, type sbt run inside the directory.
+Practically this means the entire java standard library is in scope — java time local date, java util u-u-i-d, java n-i-o file path — all callable from Scala with the same method signatures. Every artifact on maven central, which is the java virtual machine's package registry, is one line in build dot s-b-t away from being a dependency. A Scala class can extend a java class. A java class can extend a Scala class. Same extends keyword, same v-table, same single-inheritance rules.
 
-One last topic before we wrap up. Scala 3 supports two equivalent surface syntaxes for code blocks. The first is significant indentation, where the body of a method or block is marked by indentation, just like in Python. The second is brace style, where the body is wrapped in curly braces. Both styles parse to exactly the same tree. They produce identical bytecode. You can choose per file. This track will use indentation style by default because it is the idiomatic Scala 3 direction and it removes visual noise. When you read Spark's source code, you will see brace style, because Spark itself still targets Scala 2 point thirteen for now. Both shapes are valid Scala. Pick whichever reads better in the file you are editing.
+There are three friction points, in order of how often you will trip over them. The first is null. Java application programming interfaces return null to signal absence; Scala application programming interfaces use option. Wrap java returns in option of parentheses at the boundary to stop nulls from leaking into your Scala code. Notebook six covers this. The second is checked exceptions. Java has them; Scala does not. You catch them in Scala using the same try and catch, but the compiler will not force you to. Notebook six again. The third is collection conversions. A java util list is not a scala collection list. Import scala j-d-k collection converters and call dot as-scala or dot as-java to convert at the seam.
 
-Comments follow the conventions you know from Java and C. Two forward slashes start a single line comment that runs to the end of the line. Slash star starts a block comment that runs until the matching star slash. There is also a special form, slash star star, which begins a ScalaDoc comment. ScalaDoc comments document public application programming interfaces, and tools like scaladoc turn them into HTML reference documentation, much like javadoc does in the Java world.
+You will see all three of these in the Spark code you read later. Spark's java application programming interface layer is the canonical example of working across this boundary.
 
-That is the on ramp. You now have Scala 3 installed. You can poke at it in the interactive console. You can run a single file with the scala command line interface. And you can scaffold a real project with the simple build tool.
+When not to use Scala.
 
-Notebook two starts the language itself. We will look at val versus var in depth. We will look at the type system that you mostly cannot see, because the compiler infers it for you. And we will look at a small but important shift in mindset. In Scala, if, while, and for are not statements. They are expressions. They return values. That small change has surprisingly large consequences for how the rest of the language is shaped, and it is where the real learning begins.
+Three honest cases where reaching for Scala is the wrong call.
+
+First, when you need fast cold-start command-line tools or amazon web services lambdas. Java virtual machine startup latency dominates short-lived processes. Go, rust, or even a python script will give your users a faster command-line tool with less effort. Graal v-m native image is an escape hatch but adds real build complexity.
+
+Second, when the team's centre of gravity is python or java. Scala has a real learning curve — implicits, variance, the type system, two competing functional programming ecosystems called typelevel and zio. If nobody on the team will mentor newcomers through it, you will pay maintenance cost for years.
+
+Third, when you only need a one-off scripted extract transform load. A python script with pandas or duck d-b is faster to write, easier to share, and runs everywhere. Reach for Scala when something downstream — Spark, type safety on a big domain model, java virtual machine library access — actually demands it.
+
+The honest rule. Scala pays for itself when you would otherwise be writing a lot of java, or when type-safe domain modeling is the hard part. For everything else, the simpler tool usually wins.
+
+Installing the toolchain — coursier.
+
+The recommended installer is coursier — a single tool that fetches a compatible java development kit, the Scala 3 compiler, the read eval print loop, scala-cli, s-b-t, and scalafmt in one shot.
+
+On a mac the path is two commands. You run brew install coursier first, then run c-s setup. Run them in your terminal, not in this notebook — they touch your shell configuration files.
+
+C-s setup does three things. It installs a java development kit if one is not already on your path, defaulting to a recent build called temurin. It drops launchers for scala, scala-cli, s-b-t, scalafmt, and friends into a coursier-managed directory. And it adds that directory to your shell path by editing your dot z-s-h-r-c or dot bash-r-c file.
+
+Open a fresh terminal after coursier setup finishes so the updated path takes effect. Then verify each piece responds. You run scala dash dash version and expect to see something starting with Scala code runner version three point something. You run scala-cli dash dash version, you run s-b-t dash dash version, and finally java dash dash version to see which java development kit coursier picked.
+
+If java dash dash version reports a version below seventeen, you need to upgrade. Scala 3 supports java eight and up, but Spark three point five and most of the modern ecosystem expect java seventeen or twenty-one. Install one with brew install cask temurin at twenty-one and re-run coursier setup. The rest of this track will assume java seventeen or higher from here on.
+
+If a coursier command errors with command not found, the launcher directory is not on your path. Open a fresh terminal first. If that does not help, source your shell configuration explicitly with source dot z-s-h-r-c for z-shell or source dot bash-r-c for bash.
+
+Three on-ramps — pick by size.
+
+Scala gives you three ways to run code. Pick the one that matches the size of what you are doing.
+
+The read eval print loop is for one-line exploration — what does this expression actually do. The cheapest feedback loop in the language. You open it, type, and see the result and the inferred type on the same line. No file at all.
+
+Scala-cli is for a single file you want to keep around. Add dependencies via a magic comment at the top of the file. The tool was donated by virtus lab to the Scala center; as of 2026 it is the official Scala runner.
+
+S-b-t is for anything that has more than one file, or that you want to build, package, and test seriously. This is what Spark itself uses, and what notebook eight will lean on for the type-class examples.
+
+On-ramp one — the read eval print loop.
+
+Open the read eval print loop by running scala with no arguments. You get a scala prompt that evaluates one expression at a time, echoes the result back with its inferred type, and binds it to an automatic name like res zero, res one, res two, so you can reuse it.
+
+Picture a typical session. You type print line of the string hello scala three. It prints back hello scala three. Then you type val name equals the string ganesh, and the read eval print loop echoes that name has been bound to a value of type string, with the value ganesh. Then you type an s-string — s, quote, hello, dollar name, quote. The read eval print loop binds the result to the automatic name res zero, with type string, value hello ganesh. Then you ask for res zero dot length, and you get back res one bound to an integer, value thirteen. Then you ask colon type res zero, and the read eval print loop replies string. Finally, colon quit exits.
+
+Four details to register from that session.
+
+The read eval print loop infers and echoes the type. Writing val name equals the string ganesh is one line of input, but the read eval print loop shows you that the inferred type is string. This is the fastest way to ask the compiler what type would this be — type the expression, read the answer.
+
+The s prefix before a string is a string interpolator. It lets dollar name and dollar braces splice values into the string. The compiler turns it into a string builder chain at compile time, not at runtime, so there is no parsing cost. Other built-in interpolators include f for print-f-style formatting and raw for disabling backslash escapes.
+
+The automatic res names are real. Every expression that does not get an explicit val name is bound to the next res slot. You can reuse it on later lines. Handy for quick exploration.
+
+Lines that start with a colon are read eval print loop commands, not Scala. Colon help lists them all. Colon type followed by an expression shows the inferred type without evaluating it. Colon quit exits.
+
+On-ramp two — scala-cli.
+
+For anything longer than two lines, put it in a dot scala file and run it with scala-cli. Picture a file called hello dot scala with two lines of code — the annotation at-main, followed by def hello of empty parentheses returning unit, equals, then on the next line, indented, print line of the string hello from scala-cli.
+
+You run it from the same directory with scala-cli run hello dot scala, and it prints hello from scala-cli.
+
+Two new shapes appeared in that tiny file.
+
+At-main def hello is the entry point annotation. Any top-level method tagged at-main is callable as a program. The method name becomes the command name — scala-cli run hello dot scala looks for an at-main method to call. No more object main extends app boilerplate that Scala 2 needed. No public static void main string args ceremony that java needs.
+
+The colon unit equals part is the return type. Unit is Scala's equivalent of void. The difference is that unit is a real type with exactly one value, written as empty parentheses. That sounds pedantic but it matters when functions are values — a function that returns nothing still has a real return type you can write down. We will lean on this in notebook three.
+
+The at-main method can also take parameters, and scala-cli will parse the command-line arguments to match them. Picture an at-main def greet that takes a name of type string and times of type integer, and on the next line a for loop over the range one to times, printing hello, name, each iteration. You run it as scala-cli run greet dot scala, then a double dash, then the name and the count. The double dash separates scala-cli's own flags from arguments to your program.
+
+Adding dependencies in a single file. Scala-cli reads magic comments at the top of the file that start with slash slash greater-than. The most common ones are using scala followed by a version, and using dep followed by a maven coordinate. The maven coordinate uses two percent signs between the organization and the artifact name, which tells s-b-t-style tooling to append the Scala binary version automatically. Then you import the library and use it. Scala-cli resolves the dependencies, compiles, and runs — no build dot s-b-t, no project directory. For exploring a library or writing a small tool, this is the fastest path.
+
+On-ramp three — s-b-t.
+
+For a real project, s-b-t — short for simple build tool — gives you a directory layout, dependency management, incremental compilation, and a test runner. You will meet it properly when this track bridges to Spark. For now, the scaffold and the layout are enough.
+
+You generate a fresh project from the official Scala 3 template with s-b-t new scala slash scala three dot g eight. S-b-t downloads the template, asks for a project name, and creates a directory with the standard layout.
+
+That layout. At the top is build dot s-b-t, the project configuration file. Then a project directory containing build dot properties, which pins the s-b-t version. Then the source directory called s-r-c, containing main slash scala for production code and test slash scala for tests. And a target directory for compiled output and cache, which you git-ignore.
+
+A minimal build dot s-b-t configures the Scala version, the project version, the project name, and any library dependencies. Three shapes worth noting at this stage. The colon equals operator is the s-b-t operator for set this setting to this value. The plus plus equals operator is append to this collection setting. The two percent signs operator is Scala-aware dependency notation — it appends the Scala binary version to the artifact name automatically, so the same line works whether you are on Scala 3 point 4 or Scala 3 point 5. And the percent test annotation scopes a dependency to the test configuration only.
+
+You run the project from the directory with s-b-t run, or you open the s-b-t shell with just s-b-t and then issue commands interactively — compile, run, test, or tilde test for continuous watch-and-retest.
+
+Indentation versus brace syntax.
+
+Scala 3 supports two equivalent surface syntaxes for code blocks. The same method, both ways. In indentation style, you write def greet of name colon string, returning string, equals, then on the next line indented, val greeting equals s-string hello name, and on the next line greeting dot to-upper-case. In brace style, you wrap the same body in curly braces after the equals sign.
+
+Both parse to the same syntax tree. Pick whichever reads better for the file you are editing, and ideally stay consistent within a file.
+
+This track defaults to indentation style for two reasons. It matches the Scala 3 idiomatic direction the language designers nudge you toward. And it removes visual noise from short methods — and most methods you write should be short.
+
+You will see brace style when you read Spark's source code, because Spark still targets Scala 2 point 13. Do not let the brace style throw you. It is the same language.
+
+One subtlety. In indentation style, the end marker can optionally close a long block, mainly for clarity on long methods or classes. It is never required. Use end sparingly. If you are tempted to add it for readability, the method is probably too long and should be split first.
+
+Comments and scaladoc.
+
+Same conventions as java and c, with one Scala addition called scaladoc. Single-line comments start with two forward slashes. Multi-line block comments are wrapped between slash-star and star-slash. Scaladoc comments start with slash-star-star and are used to document public application programming interfaces. Tools like scaladoc turn these into hypertext markup language reference docs.
+
+Scaladoc tags worth knowing — at param for parameter documentation, at return for the return value, at throws for thrown exceptions, at see for cross-references, and at example for inline examples. The official Scala 3 standard library documentation site is itself scaladoc output. That is the shape you are producing when you write scaladoc.
+
+How Spark uses Scala — what to expect when you read its source.
+
+Apache Spark itself is written in Scala. When you eventually crack open the Spark source — and this track's apache-spark repo will give you many reasons to — there are five shapes you will see over and over. None of them will be a surprise by the end of this track.
+
+You will see case class row, taking an array of any, as the in-memory representation of one record. That is a case class — an immutable data record with auto-generated equals, hash code, to string, and pattern matching support. Notebook five covers case classes.
+
+You will see dataframe dot filter passed an underscore-lambda checking the amount field — that is a lambda expression passed where a function-of-one-argument is expected. Functions as values. Notebook three.
+
+You will see sealed trait join type, followed by case object inner extends join type, case object left outer extends join type, and so on. That is an algebraic data type — a closed set of subtypes the compiler can check exhaustively in a match expression. Notebooks five and six.
+
+You will see implicit val enc colon encoder-of-some-type — that is a type-class instance. The Scala 2 syntax uses the implicit keyword. Scala 3 uses given. Same idea, cleaner keyword. Notebook eight.
+
+You will see future of expensive computation, dot map of plus one — asynchronous computation wrapped in a future, then chained with combinators that compose the asynchronous result without blocking. Notebook nine.
+
+Spark also still uses brace syntax and Scala 2 point 13 throughout. The constructs are identical; only the surface syntax differs. You will not be reading unfamiliar territory. You will be reading the same language with curly braces and an older keyword for given.
+
+What is next.
+
+You now have Scala 3 installed, you can poke at it in the read eval print loop, you can run a one-file script with scala-cli, and you know what an s-b-t project looks like.
+
+Notebook two starts the language proper — val versus var, the type system you mostly cannot see, and the fact that if, while, and for are expressions that return values. A small mental shift, with large downstream consequences for how Scala code reads.

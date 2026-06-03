@@ -1,0 +1,217 @@
+Collections.
+
+What is covered. This notebook has two halves. The first half is shapes — the five collections you reach for daily, and what each is good at. The second half is operations — the higher-order methods that operate on all of them, plus the for-yield sugar that desugars into exactly those operations.
+
+For shapes, we will walk through the two parallel collection hierarchies, why immutable does not mean slow, then the five workhorse shapes — list, vector, set, map, and array. And tuples as a bridge into the case classes you will meet in notebook five.
+
+For operations, we will walk through the three you will use every day — map, filter, and flat-map. Then fold and reduce for aggregation. Group-by and group-map-reduce for turning a flat sequence into a keyed structure. Partition, span, and split-at for slicing. Zip and unzip for pairing two sequences. Sort-by, sort-with, and the natural sorted. The predicate family — take, drop, take-while, drop-while, find, exists, for-all. Collect, which is map plus filter in one pass when a partial function fits. Then for-yield and what it actually compiles to. Lazy collections — view, iterator, and lazy-list. And conversions, with the java interop boundary.
+
+Part one — shapes.
+
+The landscape in one breath.
+
+Scala ships two parallel collection hierarchies. One immutable, one mutable. They live in two different packages — scala dot collection dot immutable, and scala dot collection dot mutable. The default import that comes with every Scala program points at the immutable side. So when you write list, vector, set, or map in your code without any extra import, you are getting the immutable version automatically. The mutable versions require an explicit import.
+
+This is a deliberate language design choice. Immutable is the easy path. Mutable is opt-in.
+
+There is also one collection that lives outside both hierarchies. Array. Array is a thin wrapper over the java virtual machine's primitive array type. It is mutable. We will come back to it near the end of part one.
+
+Immutable does not mean slow.
+
+A common worry. If I cannot mutate, every change copies the whole collection — that must be wasteful.
+
+The immutable collections share structure under the hood. When you prepend an element to a list, the language does not copy the entire list — it creates a new cell that points at the existing tail. The same idea applies to vector, which shares branches of its internal tree, and to map, which shares unchanged branches of its hash trie. Producing a new collection that differs slightly from an old one is usually a small operation.
+
+Three reasons to prefer immutable by default. Safe sharing — an immutable collection can be passed across threads, across functions, across Spark executors, with zero coordination. No locks, no defensive copies. Easier to reason about — a value that cannot change is one less moving part. The function you read on page twelve produces the same answer whether the function on page fourteen ran first or not. And structural sharing makes derivation cheap — Spark's entire programming model is built on this assumption. Resilient distributed datasets and dataframes are immutable. Every Spark operation produces a new one. Notebook nine of the apache-spark repo revisits this.
+
+List — the singly-linked default.
+
+List is Scala's immutable singly-linked list. It is built out of two shapes — the empty list, written nil, and the cons cell, written with the double-colon operator, which prepends one element to another list. So the list one, two, three is internally one cons two cons three cons nil. Each cell holds a value and a pointer to the rest. You can picture it as a chain — the value one in a cell with an arrow to a cell holding two, with an arrow to a cell holding three, with an arrow to nil at the end.
+
+That layout decides what is fast and what is slow. Head, tail, and is-empty are constant time — they read the first cell. Prepend with double-colon is constant time — a new cell pointing at the old list. Random access by index is linear — it walks the chain. Reaching the last element is linear. Append with the colon-plus operator is linear — it walks the whole chain.
+
+Reach for list when you build front-to-back and consume front-to-back, especially in code that uses recursion or pattern matching. Pattern matching on head double-colon tail is the most idiomatic way to walk a list in Scala — notebook six leans on this.
+
+In code, picture val x-s equals list of one, two, three. Head returns one, tail returns the list of two and three, is-empty returns false. Then prepend with zero double-colon x-s — the result is the list of zero, one, two, three. Note the right-associative quirk. Zero double-colon x-s is x-s dot double-colon of zero, because methods ending in a colon bind to the right. Build a list the long way as one cons two cons three cons nil, and it equals list of one, two, three. Append with the colon-plus operator gives you list of one, two, three, four — but avoid that in a tight loop because it is linear.
+
+Vector — the default indexed sequence.
+
+Vector is internally a balanced thirty-two-way tree. From the outside it behaves like an array. From the inside, the tree is so shallow that indexed access at any position is effectively constant time, even for very large vectors. Practically, you can treat vector access as constant time and not worry about it.
+
+Random access, append with colon-plus, prepend with plus-colon, and the updated method are all effectively constant time. The operators have a tiny mnemonic. Where the colon sits is always next to the collection. Vec colon-plus x is append — the colon is next to vec, so vec is the collection and x is the new element. X plus-colon vec is prepend — same logic.
+
+Reach for vector when you need indexed access with a mix of prepend and append, or when you simply do not know exactly what your access pattern will be. The rule of thumb. When in doubt between list and vector, pick vector. Pick list only when you specifically want cons-cell ergonomics for recursion or pattern matching.
+
+In code, picture val v equals vector of ten, twenty, thirty, forty. Indexed access at position two gives thirty. Append v colon-plus fifty gives vector of ten, twenty, thirty, forty, fifty. Prepend zero plus-colon v gives vector of zero, ten, twenty, thirty, forty. The updated method at position one with the value nine ninety-nine gives a new vector with that position changed. The original v is untouched in all three cases.
+
+Set — uniqueness and membership.
+
+A set holds unique elements with no defined iteration order. The fast operation is membership testing — asking is this element in the set is roughly constant time.
+
+Contains, plus to add, minus to remove — all roughly constant time. Union, intersect, and diff are linear in the smaller side.
+
+The quietly powerful idea. A set of a is also a function from a to boolean. So if you have a set of string called s, you can call s of the string red and it returns true or false — same as s dot contains of red. This means a set can be passed directly anywhere a predicate is expected — to filter, to exists, anywhere. The higher-order machinery composes cleanly with sets.
+
+In code, picture val colors equals set of red, green, blue. Contains of red is true. Calling colors of yellow — the set-as-predicate form — is false. Plus yellow gives a new set with yellow added. Minus red gives a new set without red. Intersect with a warm set of red, orange, yellow gives a set containing just red. Union gives all colors. Diff gives green and blue. The set-as-predicate composes cleanly — you can pass a set directly to filter or to exists without converting it first.
+
+Map — key to value lookup.
+
+Map is the immutable hash map. It maps keys to values, with unique keys. You construct one with the arrow notation — the string alice arrow thirty produces a key-value pair where alice is the key and thirty is the value. Wrap a series of pairs in map of parentheses and you have a map.
+
+Lookup has two forms. The unsafe form — call the map like a function with the key in parentheses. Returns the value directly, or throws no-such-element exception if the key is missing. The safe form — m dot get of the key returns an option of v. Some of value if present, none if missing. Notebook six covers option in depth. There is also m dot get-or-else of the key and a default, which returns the value if present, otherwise the default, without involving option.
+
+You modify a map by deriving a new one. M plus the pair k arrow v adds, m minus k removes, m dot updated of k and v changes the value at an existing key. All return new maps.
+
+About the arrow notation. The expression alice arrow thirty is not special syntax built into map. The arrow operator is defined on every value, on any. It returns a two-tuple. So alice arrow thirty returns the tuple alice comma thirty, and map of parentheses is just a collection of such tuples. That is why iteration over a map yields tuples, and why you can destructure them in a for expression with for parentheses name comma age drawn from ages.
+
+In code, picture val ages equals map of alice arrow thirty, bob arrow twenty-five, carol arrow forty-two. The unsafe lookup ages of alice returns thirty. The safe lookup ages dot get of alice returns some of thirty. Ages dot get of dave, who is not in the map, returns none. Ages dot get-or-else of dave and zero returns zero. Then modifications — plus the pair dave arrow eighteen adds dave, minus bob removes bob, updated of alice and thirty-one changes alice's value. Iteration over the map gives you the name-age tuples.
+
+Array — the mutable, fixed-size, java-flavoured one.
+
+Array is Scala's thin wrapper over a java array. It is mutable, fixed-size, and lives outside the immutable collections hierarchy. Use it when you need the exact memory layout that a contiguous block of primitives gives you, or when you are talking to a java application programming interface that expects an array.
+
+Three things to register. Indexing uses parentheses, not square brackets. Square brackets in Scala always mean type parameters, never indices. So a-r-r of i gives you the element at position i. Arrays are mutable — a val binds the array, but the contents can still change in place. This is the gap that notebook two hinted at. Val locks the binding, not the value. Arrays cannot grow — they have a fixed length. If you need a resizable indexed sequence, use vector for immutable or mutable dot array-buffer for mutable.
+
+In practice you will see array in three places. Low-level performance code. Java interop. And Spark internals, because Spark stores partition data as primitive arrays for cache efficiency.
+
+In code, picture val a-r-r equals array of ten, twenty, thirty. A-r-r of zero is ten. Then mutation in place — assign nine ninety-nine to a-r-r of zero, and the array now starts with nine ninety-nine. Even though it was bound with val, you can still mutate the contents. You just cannot rebind the val to a different array. Then array dot updated of one and nine ninety-nine returns a new array with that position changed, leaving the original alone. And import scala collection mutable array-buffer, then build one with one, two, three, and the plus-equals operator appends in place.
+
+Tuples — small, fixed groupings.
+
+A tuple is not a collection in the same sense, but every map entry is built on them, so it is worth meeting now. A tuple holds a small fixed number of values of possibly different types. You construct it with parentheses, and you access elements positionally with underscore one, underscore two, and so on.
+
+You can also destructure a tuple on the left side of a val. Val parentheses name comma age equals pair binds both halves at once.
+
+When to switch away from tuples. Tuples are great for two or three values used immediately. When you find yourself reaching for underscore four, or naming what each tuple field means in a comment, switch to a case class. Case classes give you named fields with the same convenience — notebook five.
+
+In code, picture val person of type parentheses string comma integer comma double equals the tuple ganesh, thirty, one point seven eight. Underscore one is ganesh. Underscore two is thirty. Underscore three is one point seven eight. Destructuring — val parentheses name age height equals person — binds three names at once. And the swap helper on a two-tuple flips the elements.
+
+Picking a shape — the cheat sheet.
+
+If you want to build front-to-back and walk recursively or pattern-match, reach for list. If you want indexed access with mixed prepend and append, reach for vector — that is the default when in doubt. For membership testing or deduplication, reach for set. For key-to-value lookup, reach for map. For java interop or contiguous primitives, reach for array. For a mutable resizable buffer, reach for mutable dot array-buffer. For two or three values bundled briefly, use a tuple. For named fields on a small record, jump ahead to case classes in notebook five.
+
+Part two — operations.
+
+The operations in this half apply uniformly across list, vector, set, map values, array, and even string, which behaves like an indexed sequence of char for these purposes. Learn them once and they work everywhere.
+
+The demo data for the next several examples is a list of bank transactions. A case class called t-x with fields i-d, category, amount, and status. The list contains seven transactions — three grocery, two fuel, two dining — with a mix of approved and declined statuses.
+
+Map, filter, flat-map — the three you will use every day.
+
+Map transforms each element with a function. The shape is preserved.
+
+Filter keeps elements that satisfy a predicate. The shape is preserved.
+
+Flat-map applies a function that returns a collection, then flattens one level. Useful when each input produces zero, one, or many outputs.
+
+In code, picture t-x-s dot map of underscore dot amount, which gives a list of the seven amounts. T-x-s dot filter of underscore dot status equals equals approved, which gives the approved transactions only. Chain them — filter then map — to get a list of just the approved amounts. Then a flat-map example. A case class order with an i-d and a list of lines. Three orders, with two, one, and three lines each. Orders dot flat-map of underscore dot lines gives the flattened list of all six line items in order.
+
+Fold and reduce — aggregation.
+
+Both collapse a collection down to a single value by repeatedly combining elements. The difference is whether you provide an initial seed.
+
+Fold of a seed and an operation starts with the seed and combines with each element. Works on empty collections, returning the seed. The fold-left variant fixes the traversal direction left to right; fold-right goes the other way.
+
+Reduce takes only an operation, no seed. It combines the first two elements, then the result with the third, and so on. Throws on an empty collection. Use reduce-option to get back an option instead.
+
+When the seed type and the element type are the same, reduce is shorter to write. When they differ — say, accumulating a map while iterating over a list — you need fold.
+
+In code, picture x-s as a list of one through five. Reduce of underscore plus underscore is fifteen, the sum. Dot sum is the same thing. Dot product is one hundred twenty. Fold-left of zero with the addition operator is also fifteen. Fold with a different accumulator type — fold-left of empty string with a function that prepends a dash and the element — produces dash-one-dash-two and so on. Fold-left and fold-right differ on non-commutative operations — for subtraction, fold-left gives negative fifteen while fold-right gives three. Reduce-option on an empty list returns none safely; on the populated list it returns some of fifteen.
+
+Group-by and group-map-reduce — flat to keyed.
+
+Group-by of a function partitions the collection by the result of the function. Returns a map from key to list of elements that produced that key.
+
+Group-map-reduce of three arguments — a key function, a map function, and a reduce function — is a three-step shortcut. Group by key, map each element, then reduce per group. Much cheaper than group-by followed by view dot map-values then map and reduce, because it builds the result in one pass.
+
+When you find yourself writing group-by then view dot map-values then to-map, switch to group-map-reduce. It expresses the intent more directly.
+
+In code, picture t-x-s dot group-by of underscore dot category. The result is a map from category name to the list of transactions in that category. Then total amount per category — t-x-s dot group-map-reduce of underscore dot category, then underscore dot amount, then underscore plus underscore — returns a map from category to total amount, in a single pass. Count per status — group-map-reduce of underscore dot status, then a constant function returning one for each element, then addition — returns a map from status to count.
+
+Partition, span, split-at — slicing.
+
+Partition of a predicate splits into two collections — those where the predicate is true, and those where it is false. Returns a tuple of matching and not-matching.
+
+Span of a predicate splits at the first element where the predicate becomes false. Everything before that point goes to the left tuple half; everything from there onward goes to the right.
+
+Split-at of a position splits at the index n. First half is the first n elements, second half is everything else.
+
+In code, picture x-s as a list of one through ten. Partition of underscore modulo two equals zero gives a pair of the evens — two, four, six, eight, ten — and the odds. Span of underscore less than five gives a pair of the small prefix — one, two, three, four — and the rest from five through ten. Split-at of three gives a pair of the first three elements and the last seven.
+
+Zip, unzip — pairing two sequences.
+
+Zip pairs corresponding elements from two collections. The result has the length of the shorter one.
+
+Unzip is the reverse — given a collection of pairs, return two collections.
+
+Zip-with-index is like zip against the natural numbers — useful when you need positions.
+
+In code, picture a list of three names and a list of four ages. Names dot zip of ages gives three tuples — the fourth age is dropped because names is shorter. Unzip on the paired list returns two lists. Zip-with-index on names gives the three names paired with zero, one, two.
+
+Sort-by, sort-with, sorted — three flavours of ordering.
+
+Sorted sorts using the natural ordering of the element type. Works only when one is defined.
+
+Sort-by takes a function that derives a sort key. Cleaner than sort-with when one field decides everything.
+
+Sort-with takes a custom less-than function. Most flexible, slightly noisier.
+
+In code, picture a list of numbers, sorted, gives the ascending order. Reverse gives descending. Sort-by underscore dot amount on the transactions list orders them by amount ascending. To sort descending, you can negate the numeric key — sort-by of negative underscore dot amount. Sort-with takes a two-argument less-than — for example, sort first by status, breaking ties by amount.
+
+The predicate family — take, drop, take-while, drop-while, find, exists, for-all.
+
+A family of predicate-driven operations. They all stop as soon as the answer is decided — none of them walks the whole collection unless it has to.
+
+Take of n gives the first n elements. Drop of n skips the first n. Take-while of a predicate keeps elements from the start while the predicate is true; stops at the first false. Drop-while of a predicate skips from the start while the predicate is true; keeps from the first false onward. Find of a predicate returns the first matching element as an option. Exists is true if any element matches. For-all is true if every element matches.
+
+In code, on a list of one through ten — take of three gives one, two, three. Drop of three gives four through ten. Take-while of underscore less than five gives one through four. Drop-while of underscore less than five gives five through ten. Find of underscore greater than seven returns some of eight. Find of underscore greater than one hundred returns none. Exists of underscore greater than five is true. For-all of underscore greater than zero is true. For-all of underscore less than five is false.
+
+Collect — map plus filter in one pass.
+
+Collect takes a partial function and applies it to every element. Elements where the partial function is not defined are dropped; elements where it is defined are transformed. Equivalent to filter then map, but in one pass and often clearer.
+
+A partial function is written with brace open case patterns arrow expressions brace close, and only the patterns you list count as defined. We will meet partial functions properly in notebook six.
+
+In code, picture a list of any with a mix of integers, strings, and other types. Collect with the case pattern s colon string arrow s dot to-upper-case pulls out only the strings, uppercased. The two-step filter then map version is less efficient and less idiomatic. On the transactions, collect with the case pattern t-x of underscore, the literal fuel, an amount, and the literal approved — extracts just the amount field, but only for approved fuel transactions. One pass, pattern-matched.
+
+For-yield — and what it actually compiles to.
+
+For-yield is sugar. Anything you can write with for-yield can be written as a chain of flat-map, map, and with-filter calls — and the compiler does exactly that translation under the hood.
+
+The translation rules. For x drawn from x-s yield an expression becomes x-s dot map of x arrow expression. For x drawn from x-s, with a guard if a predicate, yield an expression becomes x-s dot with-filter of x arrow predicate then dot map of x arrow expression. Multiple generators become nested flat-map calls, with the last one becoming a map.
+
+This is why for-yield works uniformly on any type that has map, flat-map, and with-filter — including option, future, try, and your own types. We will use this in notebooks six and nine.
+
+In code, picture a single-generator for-yield over the list one through four, yielding x times x — produces one, four, nine, sixteen. Add a guard with if x modulo two equals zero, and only even squares come out. Two generators — for x drawn from list of one, two, three, then y drawn from list of a, b, yield the pair x comma y — produces six tuples in the standard nested order. The explicit flat-map and map version is identical — for x-s dot flat-map of x arrow then list of a, b dot map of y arrow the tuple. Same compiled output.
+
+Lazy collections — view, iterator, and lazy-list.
+
+Eager evaluation runs every step of a chain immediately. X-s dot map then dot filter then dot take of three first allocates a full intermediate list from map, then a full filtered list, then takes three elements from that.
+
+Three Scala types let you avoid those intermediate allocations.
+
+View — x-s dot view dot map dot filter dot take dot to-list runs the chain lazily; nothing materializes until the final to-list. Use for chains over big collections when you only need part of the result.
+
+Iterator — single-pass, lazy by nature, no memoization. Reading from an iterator consumes it.
+
+Lazy-list — a list where every element is lazily computed and memoized. Useful for representing potentially infinite sequences.
+
+In code, picture nums as a million integers. The eager chain builds a million-element intermediate list, then takes three. The view chain short-circuits — nothing intermediate is built. Iterator of one through five mapped to times ten, then to-list, gives the expected list — but trying to call to-list again on the same iterator returns empty, because it is consumed. Lazy-list dot from of one is the infinite sequence of naturals. Take of five gives one through five. Even an infinite mapped expression terminates as long as you take a finite prefix.
+
+Conversions and interop.
+
+Any Scala collection can be converted to any other compatible shape with dot to of the target. To list, to vector, to set, to map — the last requires the elements to be tuples. The older dot to-list, to-vector, to-set, to-map shortcuts still exist.
+
+For java interop, import scala j-d-k collection converters and use dot as-scala or dot as-java at the boundary. Notebook one mentioned this; here it is in code.
+
+In code, picture a list of integers with a duplicate. To-set gives a set of the unique values. To of vector gives a vector. To of array gives an array. A list of pairs to of map gives a map. Then the java interop — dot as-java converts to a java list. Dot as-scala then to-list converts back. The seam is explicit.
+
+What is next.
+
+You now have the data shapes and the operations that work on them. The two big patterns to carry forward.
+
+Derive, do not mutate. X-s dot filter then map then group-by produces a new collection each step. Spark's entire programming model rests on the same idea.
+
+Reach for the right shape. Vector is the safe default. List for recursion and pattern matching. Set for membership. Map for lookup. Array for java interop and Spark internals.
+
+Notebook five introduces the building blocks of the object side of Scala — class, object, trait, case class, and enum. Case classes are how you upgrade from tuples to named records, and they are the dominant data-modeling shape across the rest of this track.

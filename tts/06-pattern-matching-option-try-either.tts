@@ -1,0 +1,153 @@
+Pattern matching, option, try, and either.
+
+What is covered. Pattern matching is one of Scala's defining features — and once you have it, you reach for it everywhere. This notebook walks through the matching machine itself, then through the three standard-library shapes that depend on it — option, try, and either.
+
+The agenda. Match as an expression. Literal, wildcard, and variable patterns. Typed patterns with the colon-type ascription inside a match. Constructor patterns for destructuring case classes and enums. Tuple, list, and sequence patterns including head-tail and varargs. Guards on cases with the if keyword. Binding with at-sign — keeping both the whole and the pieces. Or-patterns with the pipe operator. Pattern matching in vals and in for-comprehensions. Exhaustiveness checking — the compiler warning that catches missed cases. Partial functions, which are brace-case as a first-class value. Option of a, with some and none, the replacement for null. Option combinators — map, flat-map, get-or-else, fold, filter. Try of a, with success and failure, exception handling as data. Either of e and a, with left and right, the typed-error pattern. For comprehensions over option, try, and either for short-circuit composition. And when to reach for each of the three.
+
+Match — the basic shape.
+
+A match expression takes a value, walks an ordered list of case clauses, and returns the body of the first case whose pattern matches. The whole thing is an expression — it returns a value, just like if.
+
+Picture this. Val description equals day match, then a list of case clauses. Case one returns the string monday. Case two returns tuesday. And finally case underscore returns the string later in the week.
+
+Three things to notice. Top-down evaluation — the first matching case wins. Order matters. The underscore is the wildcard pattern — it matches anything and binds nothing. Use it as the default last case. And the whole expression has a type — the compiler computes the common type of all the case bodies.
+
+In code, picture val day equals three. Val description equals day match, with cases one through five returning the day names, and underscore returning weekend. Day three matches case three, so description is wednesday. Then a second match — val is-workday equals day match, with case one pipe two pipe three pipe four pipe five returning true and underscore returning false. Day three matches the or-pattern, so is-workday is true.
+
+Pattern kinds — the seven shapes that cover almost everything.
+
+The Scala pattern language is small. Most of what you will write falls into seven categories.
+
+Literal patterns — case zero arrow — match exactly that value. Wildcard patterns — case underscore arrow — match anything and bind nothing. Variable patterns — case x arrow — match anything and bind the value to x. Typed patterns — case s colon string arrow — match values of that type and bind. Constructor patterns — case t-x of i-d, underscore, underscore, underscore — match a case class or enum case and destructure its fields. Tuple patterns — case parentheses a comma b arrow — match a two-tuple and bind both halves. Sequence patterns — case list of a, b, rest star arrow — match a list with at least two elements, binding the rest as a sequence.
+
+The combinations of these, plus guards, or-patterns, and at-sign bindings, give you the full surface.
+
+In code, picture def describe taking any. Inside, a match with eight cases. Case zero arrow zero literal. Case the string scala arrow the magic string. Case n colon integer arrow s of integer dollar n. Case s colon string arrow s of string of length and dollar s dot length. Case parentheses a comma b arrow s of pair dollar a slash dollar b. Case list parens empty arrow empty list. Case list of x arrow one-element list with dollar x. Case list of underscore, underscore, rest star arrow list with two-plus elements. Case underscore arrow something else. Call describe on a series of test inputs and each lands in the expected case.
+
+Constructor patterns — destructuring case classes and enums.
+
+This is where pattern matching shines for data modelling. A constructor pattern matches a case class or enum case and extracts its fields by position. The shape is the constructor name followed by patterns for each field — nested patterns work all the way down.
+
+In code, picture case class address with city and country, case class person with name, age, and address. Val ganesh equals person of ganesh, thirty, address of bengaluru and india. Then a match on ganesh. The first case is person of n, a, address of c, the literal india arrow — and the body builds a string with the name, age, and city. The second case is the same shape but with country as a variable instead of a literal — it catches everyone else.
+
+You can ignore fields you do not care about with underscore — case person of name, underscore, underscore arrow just pulls out the name. And you can bind a whole sub-pattern with at-sign — case person of underscore, underscore, address-at-address of c, underscore — binds address to the whole nested address and also pulls out c separately.
+
+Tuple, list, and sequence patterns.
+
+Tuples, lists, and other sequences have built-in pattern syntax.
+
+Tuple — parentheses a comma b — matches any two-tuple and binds both halves. List of parens empty matches the empty list. List of x matches a one-element list. Head cons tail matches non-empty and splits off the first element. The sequence wildcard — list of a, b, rest star — matches a list with at least two elements and binds rest to the remaining sequence. In Scala 2 this was underscore star.
+
+In code, picture val pair equals the string scala and three. Val parentheses lang comma version equals pair — that is a pattern in val position. It destructures the tuple in one line. Then a recursive sum on a list. Def sum-list, taking a list of integer. Match the list — case nil returns zero. Case head cons tail returns head plus sum-list of tail. Classic functional recursion. Call sum-list on the list one through five and get fifteen.
+
+Sequence patterns with varargs. Def describe-list, generic over a, taking a list of a. Match — case nil arrow empty. Case list of x arrow single, dollar x. Case list of x, y arrow pair, dollar x, dollar y. Case list of x, y, rest star arrow dollar x, dollar y, and dollar rest dot size more. Each shape is handled cleanly.
+
+Guards, or-patterns, and bindings.
+
+Three small features that compose into clean cases.
+
+Guards. Case pattern, if condition, arrow — adds a boolean condition that must also hold. Or-patterns. Case zero pipe one pipe two arrow — matches any of multiple values in one case. The branch sees the value but cannot bind names that differ between alternatives. At-sign binding. Case x at-sign pattern arrow — binds x to the whole matched value while the pattern still destructures.
+
+In code, picture def categorize, taking an integer. Match — case zero arrow zero. Case x if x less than zero arrow negative dollar x. Case x if x less than ten arrow small dollar x. Case x if x modulo two equals zero arrow even and big dollar x. Case underscore arrow odd and big. Call categorize on zero, negative five, seven, one hundred, one hundred one — each lands in the expected case.
+
+Or-patterns. Def is-vowel, taking a char. Match — case single-quote a or e or i or o or u single-quote arrow true. Case underscore arrow false.
+
+At-sign binding. Case class email with to and body. Val e equals an email. Match — case msg at-sign email of addr comma underscore, if addr ends with example dot com, arrow — and the body uses both msg, the whole email, and addr, the destructured field.
+
+Pattern matching in vals and in for-comprehensions.
+
+Patterns work outside match too. Wherever the compiler can statically guarantee the pattern matches, you can use it on the left side of a val declaration, or as the binder in a for comprehension.
+
+If the pattern might fail — say you destructure list of a, b from a list that might be empty — the assignment will throw match error at runtime. Reserve val-position patterns for tuples and case classes where the shape is guaranteed.
+
+In code, picture val parentheses a comma b comma c equals the tuple one, two, three point zero. Always safe. Case class point with x and y. Val point of p-x comma p-y equals point of three, four. Safe if the shape is known. Val list of first comma second equals list of ten, twenty — works, but if the list had three elements, this would throw a match error.
+
+Pattern in for-comprehension — common for iterating over maps. For parentheses name comma age drawn from ages, do print line of dollar name is dollar age. The pattern destructures each key-value tuple coming out of the map.
+
+Exhaustiveness checking — the compiler's safety net.
+
+When you match on a sealed type — a sealed trait, a Scala 3 enum, or any other type the compiler can enumerate — the compiler checks that your match covers every case. If you miss one, you get a warning. In a Spark pipeline, that warning is your first line of defence against forgetting a status or a join type.
+
+The check does not trigger on open types — matching on integer, on any, on an unsealed string — because the compiler cannot know what values might appear. Make your domain types sealed, with case classes inside an enum or extending a sealed trait, to get this benefit.
+
+In code, picture enum status with three cases — approved, declined, pending. Import status dot star. Def label-complete, taking a status, returning string. Match all three cases — approved arrow ok, declined arrow no, pending arrow wait. The compiler is happy. If you comment out the pending case, the compiler warns — match may not be exhaustive. It would fail on pattern case pending.
+
+Partial functions — brace-case as a first-class value.
+
+A partial function is a function that may not be defined for all inputs. Scala lets you write one inline with the brace-case syntax — exactly the shape of a match expression's case list, but standalone.
+
+A partial-function of a and b has two methods of note. Apply of a — call it, throws match error if no case matches. Is-defined-at of a — check whether any case would match, without calling.
+
+This is what the collect collection method from notebook four takes. It is also widely used in actor libraries and in any dispatch-on-shape code.
+
+In code, picture val divide-by, of type partial-function of integer and integer, equals brace case n if n not-equals zero arrow one hundred divided by n. Divide-by dot is-defined-at of five is true. Of zero is false. Divide-by of five is twenty. Of zero throws match error. Used with collect — list of zero, one, two, three, zero, five dot collect of divide-by — drops the zeros, returns the quotients of the rest.
+
+Combining partial functions with or-else. Handle-even covers the even integers. Handle-odd covers the odd ones. Handle-any equals handle-even dot or-else of handle-odd — the combined function covers every integer. Call handle-any of four and you get even four. Of seven, you get odd seven.
+
+Option — encoding value might be missing.
+
+Option of a is a sealed algebraic data type with exactly two cases. Some, taking a value of a, means a value is present. None means no value.
+
+It is the Scala replacement for null. The difference. Null lies about types — a string that is sometimes null claims to be a string always, and you find out the truth at runtime via null pointer exception. Option of string tells the truth in the type — every caller is forced to acknowledge the missing case.
+
+The standard library returns option from any method that might legitimately have no answer. Map dot get. List dot head-option. String dot to-int-option. Most java application programming interfaces return null; wrap them with option of parens around the java call at the seam to convert.
+
+In code, picture val present of option of integer equals some of forty-two. Val absent of option of integer equals none. Print and you see some of forty-two and none. From map dot get — ages dot get of alice returns some of thirty. Ages dot get of carol, who is not in the map, returns none. Wrap a possibly-null java call — val raw equals null, val safe equals option of raw — that produces none. With a non-null string, you get some of the string. String to integer with safety — quote forty-two quote dot to-int-option returns some of forty-two. Quote x-y-z quote returns none.
+
+Option combinators — map, flat-map, get-or-else, fold, filter.
+
+The whole point of option is that you compose operations without unwrapping. The combinators automatically propagate none through a chain — if any step is empty, the whole result is empty.
+
+Map of f applies f to the inner value if present, stays none if absent. Flat-map of f is like map but f itself returns an option — it avoids option of option of a nesting. Get-or-else of a default extracts the value or uses the default if absent. Fold of a default, then of a function, combines get-or-else and map — provide a default for none and a function for some. Filter of a predicate keeps the value if it passes; otherwise becomes none.
+
+In code, picture val name-opt equals some of ganesh. Map of underscore dot to-upper-case gives some of ganesh in capitals. The same map on none gives none. Flat-map — def lookup-i-d, taking a name, returning option of integer. Name-opt dot flat-map of lookup-i-d returns some of forty-two. Some of alice dot flat-map of lookup-i-d returns none. Get-or-else — name-opt dot get-or-else of unknown gives ganesh. None dot get-or-else of unknown gives unknown. Fold — name-opt dot fold of nobody home, then a function building a hello string — gives the hello message. Filter — some of forty-two dot filter of greater than ten gives some of forty-two. Some of five dot filter of greater than ten gives none.
+
+Try — encoding computation might have failed.
+
+Try of a is a sealed algebraic data type for the result of a computation that might throw. Success, taking a value of a, means completed normally — here is the result. Failure, taking a throwable, means threw — here is the exception.
+
+Try with a brace block wraps any expression. If the block throws, you get failure of the thrown exception. Otherwise success of the returned value. This converts exception-based code into value-based code that composes the same way option does.
+
+When to prefer try over plain try slash catch — when you want to return the failure as data, chain computations together, or store and log the exception without immediately handling it.
+
+In code, picture import scala util try, success, failure. Def parse-int, taking a string, returning try of integer, body try of s dot to-int. Parse-int of quote forty-two quote returns success of forty-two. Parse-int of quote a-b-c quote returns failure of a number format exception.
+
+Combinators mirror option's. Parse-int of ten dot map of underscore times two returns success of twenty. The same on a failing parse returns failure carrying the original exception. Recover converts a failure into a success with a fallback. Parse-int of x-y-z dot recover with the case number-format-exception arrow negative one returns success of negative one. Recover-with is like recover but the handler returns a try. To-option drops the exception details — parse-int of forty-two dot to-option returns some of forty-two. Of x-y-z returns none.
+
+Either — encoding result is one of two possible types.
+
+Either of e and a has two cases. Left, taking an e, by convention is the error or alternative case. Right, taking an a, by convention is the success or main case. The mnemonic — right sounds like correct.
+
+Either is what you reach for when you want typed errors. Not exceptions, not just missing, but a specific error value carrying information about what went wrong. The error type e is on the left; the success type a is on the right.
+
+Scala 3 either is right-biased. Its map, flat-map, and for combinators operate on the right side. A left short-circuits through the chain, carrying the error untouched.
+
+In code, picture a sealed trait parse-error with three cases — case object empty-input, case class bad-format taking a string, case class out-of-range taking an integer. Def parse-positive, taking a string, returning either of parse-error and integer. If empty, left of empty-input. Otherwise match on s dot to-int-option — none gives left of bad-format. Some of n less than zero gives left of out-of-range of n. Some of n positive gives right of n.
+
+Parse-positive of quote forty-two quote returns right of forty-two. Of quote empty quote returns left of empty-input. Of x-y-z returns left of bad-format. Of negative three returns left of out-of-range.
+
+Right-biased combinators. Parse-positive of twenty-one dot map of underscore times two returns right of forty-two. Parse-positive of x-y-z dot map of underscore times two returns left of bad-format — the error is carried through. Fold — parse-positive of x-y-z dot fold of two functions, one for the error and one for the success — gives the failed message string.
+
+For comprehensions over option, try, and either.
+
+For comprehensions are not just for collections. Any type with map, flat-map, and for guards with-filter can be used in a for. Option, try, and either all qualify — and for becomes the cleanest way to chain operations that may short-circuit.
+
+The pattern. A sequence of name drawn from computation lines, each pulling the success value out of the wrapper. The first failure short-circuits — the rest of the chain is skipped, and the whole expression evaluates to that failure.
+
+In code, picture an option chain. Case class user with i-d, name, and an optional manager-i-d. A map of three users — ganesh whose manager is alice, alice whose manager is bob, and bob with no manager. Def manager-name, taking a user-i-d. For user drawn from users dot get of user-i-d, m-g-r-i-d drawn from user dot manager-i-d, manager drawn from users dot get of m-g-r-i-d, yield manager dot name. Manager-name of one returns some of alice. Of two returns some of bob. Of three returns none — bob has no manager. Of ninety-nine returns none — the user does not exist.
+
+An either chain — first left wins. Def step-one, step-two, step-three, each taking and returning either of string and integer. For a drawn from step-one of five, b drawn from step-two of a, c drawn from step-three of b, yield c — gives right of one hundred twenty-one. If step one returns left, the chain short-circuits and the result is that left.
+
+When to reach for each.
+
+A small decision table for the three.
+
+A value might be present or absent, and the absent case is normal — option. An operation might throw, and you want to handle or report the exception — try. An operation might fail with one of several known errors, and you want to carry information about which one — either of error and result. You are modeling business logic where what went wrong is part of the domain — either of your error algebraic data type and result. You are at the boundary of a java application programming interface or unrecoverable exception — try to wrap, then convert to either if appropriate.
+
+In modern Scala codebases, especially anything built on typelevel libraries, either, or its richer cousins like either-t and validated, is the workhorse. Option covers the simpler present-or-not case. Try shows up at integration boundaries with exception-throwing application programming interfaces.
+
+What is next.
+
+You now have the matching machine — guards, bindings, exhaustiveness — and the three standard-library types that encode the three flavours of might not have a value. Pattern matching plus these three are the bread and butter of every modern Scala codebase.
+
+Notebook seven turns to the type system itself. Generics — writing code that works for any type, with the precision the compiler enforces. Variance — whether a list of dog is also a list of animal, and how to choose. And the more advanced shapes Scala 3 adds — opaque types, intersection and union types, match types. The features that make Scala's type system one of the deepest on the java virtual machine.

@@ -1,0 +1,151 @@
+Concurrency and error handling.
+
+What is covered. The final notebook in the language track. Two adjacent topics — how to run computations off the main thread, and how to handle the things that can go wrong, including exceptions, missing resources, and the cleanup that has to happen either way.
+
+For concurrency. The future of a mental model — a value that will eventually be available. Execution context — the thread pool every future runs on, and why you need to pass one. Creating futures with the future block. The combinator family — map, flat-map, filter, recover, recover-with, fallback-to. For comprehensions over futures for chaining without callback hell. Future dot sequence — turning a list of future of a into a future of list of a. Future dot traverse — map and sequence in one pass. Promise of a — the write side of a future, used at the boundary with callback-based application programming interfaces. Blocking on a future with await, when it is acceptable, when it is not. Why callbacks are mostly avoided. And a short note on what comes after future — cats effect, z-i-o, and Scala 3 direct-style concurrency.
+
+For error handling and resources. Try slash catch slash finally — the java-style escape hatch. Why try and either from notebook six are usually a better fit. The using resource-management construct — try with resources for Scala. Using dot resource for single resources, using for multiple. The auto-closeable contract — what makes something using-compatible. Failing fast versus returning errors as data — the design call you make at every layer.
+
+The future mental model.
+
+A future of a is a placeholder for a value that will eventually be there. It has two interesting states. Incomplete — the computation is still running. Complete — has either succeeded with an a, or failed with a throwable.
+
+Once a future completes, it never changes again. Multiple readers see the same result.
+
+The contract. You do not ask when the value will be there. You schedule what to do with it when it arrives. The combinators — map, flat-map, recover — wrap that scheduling so it looks like ordinary chaining.
+
+Execution context — the thread pool that runs futures.
+
+Every future operation needs an execution context, which is a thread pool. The combinators do not run on the thread that called them — they run on the execution context.
+
+You provide one via Scala's context-parameter machinery from notebook eight. Three common sources. Scala dot concurrent dot execution-context dot global — the standard, a fork-join pool sized to the number of c-p-u cores. Good default for general use. A custom executor-backed context — when you need a different sizing strategy. Smaller pool, bounded queue, named threads for debugging. And a library-specific context — akka actors come with their own. Spark internally uses its own scheduler.
+
+The implicit-parameter shape is what every future application programming interface uses. Def expensive, taking an integer, with a using execution-context parameter named e-c, returning future of integer, body uses future of brace x times x close brace. Callers either have an execution context in scope — most commonly import scala dot concurrent dot execution-context dot implicits dot global — or pass one explicitly with using.
+
+In code, picture import scala dot concurrent of future, execution-context. Import scala dot concurrent dot duration dot star. Import scala dot concurrent dot await. Bring the default execution context into implicit scope with the given declaration. Then val f of future of integer equals future of a block — print the current thread name, sleep fifty milliseconds, return forty-two. The block is scheduled on the execution context — the call returns immediately. Print scheduled not done yet to confirm. Then val result equals await dot result of f and one second — that blocks until the future completes and returns forty-two.
+
+Future combinators.
+
+The combinators on future mirror those on option, try, and either from notebook six. The pattern is the same — wrap an effect that might succeed or fail, chain operations that automatically propagate failure.
+
+Map of f applies f to the successful value, in the future's context. Flat-map of f is like map but f returns a future itself. Filter of a predicate keeps the value if the predicate is true; otherwise fails with no-such-element-exception. Recover of a partial function — if the future failed, apply the partial function to the exception. Recover-with is like recover but the handler returns a future. Fallback-to of another future — if this failed, return the other. Transform of a function gives uniform transformation from try to try. And on-complete of a callback fires a side effect when the future completes — last-resort escape hatch.
+
+In code, picture def lookup taking an integer i-d, returning future of string. Body sleeps twenty milliseconds, then either throws on a bad i-d or returns the string user dash i-d. Map — lookup of forty-two dot map of underscore dot to-upper-case gives a future that eventually holds capital user dash forty-two. Recover — lookup of negative one dot recover with the case runtime-exception arrow anonymous turns the failure into the success string anonymous. Fallback-to — lookup of negative one dot fallback-to of lookup of seven returns user dash seven, the result of the second future.
+
+For comprehensions over futures.
+
+This is the cleanest way to chain multiple futures. Each name drawn from a future expression binds the success value of one future. The chain short-circuits on the first failure.
+
+For comprehensions on future desugar into flat-map and map calls — exactly the same translation as for over option from notebook six. Each step in the chain runs as soon as its dependencies complete. Independent steps that you want to run in parallel must be started before the for.
+
+In code, picture three independent fetch functions — fetch-name, fetch-age, fetch-city. Each sleeps fifty milliseconds and returns its value. The sequential pattern — for name drawn from fetch-name of one, age drawn from fetch-age of one, city drawn from fetch-city of one, yield the s-string. Each future starts only after the previous completes — total time around one hundred fifty milliseconds.
+
+The parallel pattern — start all three futures first by binding name-f, age-f, city-f to the three calls. Then the for comprehension over those three already-running futures. The three run in parallel — total time around fifty milliseconds. The difference is invisible in the syntax of the for, but obvious in the wall-clock time.
+
+Future dot sequence and future dot traverse.
+
+A common shape. You have a list of inputs, you want to fire off a future for each one, and end up with a future of the resulting list.
+
+Future dot traverse of x-s and a function f — apply f to each element to make future of b, then aggregate into one future of list of b. Equivalent to future dot sequence of x-s dot map of f, but in one pass.
+
+Future dot sequence of a list of futures — given a list of future of a, return a future of list of a. Use when you already have the list of futures.
+
+Both fail the resulting future if any of the input futures fail — exception-style. For succeed with whatever made it, combine with recover on each future first.
+
+In code, picture lookup as before. A list of i-ds from one to five. Future dot traverse of i-ds and lookup starts one future per i-d and collects the results into a future of list of string. Await it and you get all five user strings. Future dot sequence of i-ds dot map of lookup is the two-step form — first build the list of futures, then aggregate. Same result.
+
+Promise of a — the write side of a future.
+
+A promise of a is the bridge between a future and a code path that completes it externally. The promise has a dot future you hand to callers. Internally, your code calls dot success of a value or dot failure of a throwable, exactly once, when the value is ready.
+
+Most everyday code does not need promise. You reach for it when you are integrating with a callback-based application programming interface — something that calls you back when work is done, and you need to expose that as a future to your downstream code.
+
+In code, picture an old-style callback application programming interface — def fetch-old-style, taking an i-d and a callback function. Inside, start a new thread that sleeps thirty milliseconds, then calls the callback with either a left of an exception or a right of the result string.
+
+To wrap it as a future, def fetch-future, taking an i-d, returning future of string. Inside, val promise equals promise of string. Call fetch-old-style of i-d, with the callback case right of v arrow promise dot success of v, case left of t arrow promise dot failure of t. Return promise dot future. Now downstream code sees a regular future. Await fetch-future of seven and you get the old-style result.
+
+Blocking on a future.
+
+Await dot result of a future and a duration blocks the calling thread until the future completes, then returns the success value, or rethrows the failure. Await dot ready of a future and a duration is the same but returns the future itself.
+
+When await is acceptable. At the top of a main method, where the program would otherwise exit before the future completes. In tests, to assert on the result. In the read eval print loop or notebook, to see the result.
+
+When await is a bug. In production server code that handles a request per thread — you have serialized what was supposed to be concurrent. Inside a future's body — at best you waste a thread; at worst you deadlock the execution context.
+
+In modern code the answer is — do not await. Use for comprehensions and let the result flow forward, or write your application in a framework like cats effect, z-i-o, or akka that integrates concurrency end to end.
+
+Why callbacks are mostly avoided.
+
+Future provides on-complete of a callback for fire-and-forget — schedule something to happen when the future completes, return immediately. This is the lowest-level escape hatch.
+
+Idiomatic Scala uses callbacks sparingly. Reasons. Order is hard — two on-completes on the same future fire in undefined order. Errors are hard — an exception inside a callback is logged and dropped unless you explicitly handle it. Composition is hard — callbacks do not return a value, so chaining them produces nesting.
+
+Map, flat-map, and for are almost always cleaner. Reach for on-complete only when you really want side effects with no downstream computation — for example, a logger that records that a request completed, with nothing else depending on the outcome.
+
+What comes after future.
+
+Scala dot concurrent dot future is the standard library concurrency primitive. It has known weaknesses — eager execution, where a future starts the moment you create it and you cannot cancel or restart it; no resource safety; awkward interaction with structured concurrency. Production Scala increasingly reaches for one of three alternatives.
+
+Cats effect, also known as i-o — the typelevel library's effect type. An i-o of a describes a computation without running it; you compose, then call unsafe-run-sync once at the edge. Supports cancellation, resource safety, structured concurrency.
+
+Z-i-o — effect type with an explicit error and environment channel, z-i-o of r e a. Same idea as i-o but with built-in dependency injection and typed errors.
+
+Scala 3 direct-style concurrency — scala dot concurrent dot async, experimental as of 2026 — provides structured concurrency, cancellation, and exception propagation, all without flat-map chains. Looks like ordinary sequential code but runs concurrently.
+
+You do not need any of these to start. Future will carry most working code for years. The point is — if you find yourself reaching for await, threading callbacks, or wrestling with cancellation, look at one of the above before writing more future plumbing.
+
+Error handling — try slash catch slash finally.
+
+Scala has java-style try slash catch slash finally, and the bodies are expressions. The shape — val result equals try a risky operation, catch with a case clause for the relevant exception, returning a fallback value, finally a cleanup step.
+
+Try slash catch is the right tool when you are at the edge of your program — a main, a hypertext transfer protocol request handler — and need to translate an exception into a response. Inside your logic, the try, option, and either types from notebook six are usually cleaner — they make failure part of the type, instead of an out-of-band channel.
+
+In code, picture def parse-quantity taking a string, returning integer. Try s dot to-int. Catch the case number-format-exception arrow print bad input, return zero. Finally print cleanup done. Parse-quantity of forty-two prints forty-two plus the cleanup line. Parse-quantity of x-y-z prints bad input, returns zero, plus the cleanup line.
+
+Try versus try-block — when each fits.
+
+The relationship. Try-block — the control-flow form — block-local handling, then proceed. Try, capital t — the data form — wrap the result, chain combinators, return it.
+
+A rough decision rule. The exception is something you want to handle right here — try-block. The exception is something you want to return to the caller, who decides — try, capital t, or either. The exception comes from a java application programming interface at a boundary — try, capital t, of brace java-call to convert at the seam. You want to chain multiple operations, any of which may fail — try, capital t, or either or future, with for.
+
+Using — resource management.
+
+Scala 2 point 13 added scala dot util dot using for open this resource, use it, close it whether or not anything blows up. This is the Scala equivalent of java's try with resources and python's with statement.
+
+The shape — val contents of try of string equals using of source dot from-file of the path, then in braces, the lines mk-string with newline.
+
+Using takes the resource expression, runs your block with the resource, and always closes the resource afterward, even if your block threw. The result is wrapped in a try.
+
+There are two related forms. Using of resource and body returns a try of a, propagating failures from both the body and the close. Using dot resource of resource and body runs the body and lets exceptions propagate. Use when you would rather have the exception than the try wrapper.
+
+In code, picture imports for using and source, plus the java n-i-o file types. Create a small temp file with three lines of content. Reading with using of source dot from-file then in braces source dot get-lines dot to-list returns success of the three-line list. The file is closed automatically. Using dot resource of source dot from-file then a block that joins lines with pipe returns the joined string and lets any exception escape. Then delete the temp file.
+
+The auto-closeable contract — what makes something using-compatible.
+
+Using works with anything that has an auto-closeable shape — a close method returning unit. The standard library defines the releasable type class to formalize this. Most resource-like java types — source, input-stream, buffered-writer, j-d-b-c connection — implement auto-closeable already.
+
+If you write your own resource type, give it a close method and Scala's using machinery will pick it up via the default releasable instance for auto-closeable.
+
+In code, picture class connection taking a name and extending auto-closeable. Constructor prints opening name. A query method returns the formatted result string. Close prints closing name. Using of connection of d-b-one, with a block that calls query, prints opening, the query result, and closing — in that order. The connection is always closed.
+
+Using with multiple resources. Using dot manager of a use function — bind a to use of connection of d-b-one, b to use of connection of d-b-two, then return a combined query string. Both connections are closed in reverse order of acquisition — last opened, first closed.
+
+Failing fast versus returning errors as data.
+
+A design call you make at every layer of every system. There is no universal answer. The rule of thumb.
+
+At the edges — your main, a hypertext transfer protocol handler, a command-line interface — exceptions that you cannot sensibly handle should propagate to the top and produce a clean error response. Failing fast is fine.
+
+In the middle — business logic, library code — prefer either or try so callers can compose decisions about what to do. An exception thrown two layers down with no type information is harder to handle gracefully.
+
+At java boundaries, wrap with try, capital t, of the java call to convert the exception into a value at the seam. Then you are in the data world from then on.
+
+When in doubt — a library that returns either of your error type and a is easier to use and easier to evolve than one that throws. The error type is documented, exhaustively matched, and stable across versions.
+
+What is next.
+
+You now have the full standard-library concurrency story — future, promise, execution context, await — plus the error-handling and resource-management shapes that round out everyday Scala work.
+
+This is also the end of the language track. The next steps for this material are applied. Spark in Scala — the apache-spark repo bridges directly, with the same case-class, pattern-matching, and type-class shapes you have learned here. And the broader functional-effect ecosystem — cats effect, z-i-o — if you want a deeper concurrency story than future provides.
+
+Bookmark this track and notebook six in particular — pattern matching, option, try, either, and for comprehensions over them are the shapes that show up most often in everyday code.

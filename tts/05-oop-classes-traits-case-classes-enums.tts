@@ -1,0 +1,145 @@
+Object-oriented programming — classes, traits, case classes, and enums.
+
+What is covered. This notebook covers the object-oriented half of Scala. How to model data and behaviour with classes, share behaviour through traits, and reach for the two shapes Scala adds on top — case classes for immutable records, and enums for closed sets of alternatives. Class with primary constructor, fields, methods, and visibility. Object as a singleton, companion objects, and the apply factory pattern. When to use class versus object versus def. Trait with abstract and concrete members, multiple-trait composition, and linearization. Abstract class and when you reach for it instead of trait. Case class — what the compiler generates for you, and why it is the default data shape in Scala. Copy with named-argument updates for immutable record updates without boilerplate. Case object — the singleton case. Enum, which is Scala 3's first-class form for closed sets of alternatives. Enum with parameters and methods. Sealed trait plus case classes — the Scala 2 form you will still see in Spark, and how it relates to enum. And a pattern-matching preview that bridges to notebook six.
+
+Class — the basics.
+
+A class in Scala 3 declares a type and the way to construct instances of that type. The shape is the keyword class, then the class name, then a parameter list in parentheses, then a colon, then the body containing fields and methods.
+
+The parameters in parentheses after the class name form the primary constructor. They are not fields by default — they are just constructor parameters, visible inside the class body. To turn them into fields, prefix with val for immutable public read, or var for mutable public read and write.
+
+Visibility defaults to public. Use private or protected to restrict, just like java.
+
+In code, picture three flavours. First, a plain class called customer-a, taking name and city as constructor parameters. Inside, a method called greet returns an s-string with both. Construct one, call greet — it works. But trying to read a dot name fails to compile — the parameter is not a field.
+
+Second, customer-b adds val on name and var on city. Now both are accessible from the outside. Reading b dot name gives the name. Assigning to b dot city changes it. Then greet still works.
+
+Third, customer-c shows auxiliary constructors. You write def this taking different parameters, and inside, you call the primary constructor with a default for the missing values. This lets you offer multiple shapes of construction without changing the primary constructor.
+
+Visibility and methods.
+
+Private and protected work as you would expect. Private is the strongest — accessible only within the class. Protected is accessible within the class and subclasses.
+
+Scala adds one nuance worth knowing — private-square-bracket-this makes a field accessible only from the exact same instance, not from other instances of the same class. Almost never needed in everyday code, mentioned so it does not surprise you.
+
+In code, picture an account class taking an initial balance. Inside, private var balance holds the state. The deposit method requires a positive amount, then adds to balance. Withdraw checks the balance, decrements if sufficient, and returns a boolean. Current-balance is a public read accessor. From the outside, you can deposit and withdraw, but you cannot read balance directly — that is private.
+
+Object — singletons and companions.
+
+An object declares a single instance of a class — no constructor, no new keyword needed, the object simply is. Use it for utility methods, configuration, and constants that do not have any per-instance state.
+
+When an object has the same name as a class in the same file, it is called the companion object of that class. Companion objects are special — they can access the class's private members, and vice versa. This is where you put factory methods, like apply, and shared utilities.
+
+The apply method on a companion is the basis of the list-of-one-two-three idiom — list with no new keyword is calling list dot apply of one, two, three. Define your own apply and your class gets the same call-site sugar.
+
+In code, picture a class money with a private constructor taking val cents of type long, and an override to-string that formats the dollars and cents. Then a companion object money with three methods. Apply, taking dollars and cents, builds a new money using the private constructor — the companion can see private members. From-cents, a second factory. And zero, a constant. From the outside you call money of twelve, fifty, and you get the formatted dollar amount — no new keyword required.
+
+Class versus object versus def — when to use each.
+
+A common early confusion. Three things that all hold code, chosen by the question they answer.
+
+Def is a piece of behaviour. Pure or impure, called from somewhere. Stateless. Lives on a class, a trait, an object, or at the top level.
+
+Class is a way to make many instances, each with its own state. Has a constructor — you say my-class of parens to make one.
+
+Object is exactly one of this thing. No constructor. Existed before anyone called it.
+
+If you are tempted to put a def in a class but the class has no fields and you are never going to make more than one of it — make it an object instead. If you are tempted to make an object with mutable state shared across the whole program, ask whether that state really belongs anywhere. Global state is the same problem in every language.
+
+Trait — composable behaviour.
+
+A trait is Scala's primary tool for sharing behaviour between unrelated types. Think of it as java's interface plus default methods plus fields plus state — but you can mix in multiple traits into one class, which java cannot do.
+
+The shape — trait named, with an abstract name method that subclasses must define, and a concrete greet method that is inherited automatically. You mix a trait in with extends for the first and with for the rest. Class person extends named with aged. In Scala 3 you can also write extends x comma y comma z with commas. Both forms are equivalent.
+
+In code, picture trait named with abstract def name returning string, and concrete def greet returning s of hello dollar name. Trait aged with abstract def age returning integer, and concrete def is-adult returning age greater than or equal to eighteen. Then class person taking val name and val age, extending named, aged. Construct a person of ganesh, thirty, call greet and is-adult — both work through inheritance. Traits can also hold fields — trait counted with a private var n and a tick method that increments. Mix it into an event stream class, tick three times, and count returns three.
+
+Trait linearization — the one rule for multiple inheritance.
+
+When a class mixes in multiple traits and several of them define the same method, which one wins? The answer is linearization — Scala arranges all the supertypes in a single ordered list, from most-specific to least-specific, and method lookup walks that list.
+
+The rule, simplified. Left-to-right declaration order is reversed in the linearization, and super follows it. So when you write extends a, b, c, the lookup order is roughly c, b, a, any-ref, any. A super dot method call from a class extending a, b, c will call the implementation in c.
+
+This sounds fiddly and rarely matters in practice. Most of your traits will have non-overlapping methods, and when they do overlap you usually want the most-recently-mixed-in version. Mentioned here so the keyword does not surprise you in a Spark or library source file.
+
+In code, picture trait greeter with greet returning hi. Trait loud extends greeter, overriding greet to call super dot greet and append an exclamation mark. Trait excited does the same, appending two exclamation marks. Class a extends greeter, loud, excited. Class b extends greeter, excited, loud. Both end up with three exclamation marks total, but built in different orders.
+
+Abstract class versus trait.
+
+Both can have abstract members and concrete members. So when do you reach for one over the other?
+
+Trait — when you want composition. Multiple traits can be mixed into one class.
+
+Abstract class — when you need a primary constructor with parameters. Scala 2 traits could not take parameters; Scala 3 traits can, with some restrictions. Or when you are interoperating with java code that expects a single inheritance hierarchy.
+
+The default is trait. Reach for abstract class only when you specifically need its features.
+
+Case class — the headline feature.
+
+A case class is a class with a pile of free behaviour the compiler generates for you. It is the dominant data-modelling shape across modern Scala code, and you will see it everywhere in Spark, in standard-library types like some and right, and in your own code.
+
+Adding the case keyword to a class gives you, for free, a long list of generated behaviour. Constructor parameters are val automatically — no need to write val on each parameter. An apply method on the companion, so you can construct without new. An unapply method on the companion, so pattern matching with the case syntax works. Structural equals and hash-code — two instances with the same fields are double-equals. To-string showing field names — useful for debugging, logging, the read eval print loop. A copy method to create a new instance with some fields changed. Product-arity and product-element for generic iteration over fields. And serializable by default — important for Spark, because case classes ship cleanly to executors.
+
+You do not write new to construct a case class. You do not write val on its parameters. You do not write equals, hash-code, or to-string.
+
+In code, picture case class t-x with four fields — i-d, category, amount, status. Construct t-one, t-two, and t-three — no new keyword. T-one and t-two have the same field values, so t-one equals-equals t-two is true. T-three differs, so t-one equals-equals t-three is false. Print t-one and you see t-x followed by the comma-separated field values. T-one dot amount reads the val. Then call t-one dot copy of status equals declined — you get a new instance with the changed status. The original t-one is untouched.
+
+Copy and named updates — the immutable update idiom.
+
+Mutable records use assignment. Immutable records use dot copy. The original is untouched. You get a new instance with the field changed.
+
+Copy accepts any subset of the case class's parameters by name. Unsupplied fields default to the original's values. This is the Scala idiom for update one field of a deeply-nested structure — combined with for comprehensions or lenses libraries, it scales to arbitrary depths.
+
+In code, picture case class address with street, city, country, and case class person with name, age, and address. Construct ganesh with a nested address in bengaluru. Then ganesh dot copy of age equals thirty-one gives a new person with the updated age. To update the nested city, copy the inner address with the new city, then copy the outer person with the new address. The original ganesh is untouched in both cases.
+
+Case object — the singleton case.
+
+When a case-class-style value has no parameters, you reach for case object instead of case class. There is only ever one of it; multiple constructions are not meaningful.
+
+This is the canonical shape for sentinel values, status singletons, and the no-payload alternatives in an algebraic data type. Standard-library examples include nil, which is the empty list, and none, which is the empty option.
+
+In code, picture case object empty. Empty equals-equals empty is true, by identity. Compare empty to other things — empty equals-equals empty stays true, empty equals-equals filled of one is false. The singleton has the same equals and to-string treatment as a case class, but only one instance ever exists.
+
+Enum — Scala 3's first-class algebraic data type.
+
+An enum declares a closed set of alternatives. Each alternative is a case. The compiler knows the set is closed, which means pattern matching on an enum can be checked for exhaustiveness — the compiler warns you when you forget a case.
+
+The simplest form, alternatives with no payload, is the equivalent of a java enum. Enum status with cases approved, declined, pending.
+
+More interestingly, alternatives can carry data. This is where enum becomes the full algebraic data type. Enum shape with case circle taking a radius, case rectangle taking width and height, case triangle taking base and height. Each case with parameters is essentially a case class. Each case without parameters is essentially a case object.
+
+In code, picture enum status with three plain cases. Bind val s to status dot approved. Print s, you see approved. Status dot values dot to-list gives the list of all three. Status dot value-of of pending parses a string back into the enum value.
+
+Then the algebraic shape — enum shape with three parameterized cases. Import shape dot star to bring all cases into scope. Define def area, taking a shape, returning a double, using a match expression. Case circle of r returns pi times r squared. Case rectangle of w and h returns w times h. Case triangle of b and h returns one half times b times h. Call area on a circle of radius three, a rectangle four by five, a triangle base six height four — get the three areas.
+
+Enum with parameters and methods.
+
+An enum can declare shared parameters and methods that apply to every case. The cases pass values up to those parameters when they construct.
+
+In code, picture enum planet, taking val mass-kg of double and val radius-m of double. The cases mercury, venus, earth, mars each extend planet with their physical constants. Inside the enum body, a private val capital g holds the gravitational constant. A method surface-gravity returns g times mass over radius squared. Another method surface-weight, taking another mass, returns the weight on this planet. Then planet dot earth dot surface-gravity gives nine point eight one meters per second squared. Planet dot mars dot surface-weight of seventy-five gives the weight in newtons.
+
+The Scala 2 shape — sealed trait plus case classes.
+
+Before Scala 3 added enum, the standard way to express an algebraic data type was a sealed trait with case classes or case objects extending it. You will still see this everywhere in the wild, including in every Spark source file. Spark targets Scala 2 point 13.
+
+Picture sealed trait status, then case object approved extends status, case object declined extends status, case object pending extends status.
+
+Sealed is the magic word. It means no class outside this file may extend this trait. The compiler can then enumerate all the subclasses, which is exactly what enables exhaustiveness checking on a match.
+
+The Scala 3 enum shape compiles to roughly this under the hood. Use enum in new code; recognize the sealed-trait pattern when reading older code or Spark internals.
+
+In code, picture the Scala 2 Spark-style algebraic data type for join types. Sealed trait join-type, with case object inner, case object left-outer, case object right-outer, case object full-outer, and case class custom taking a predicate string. Then def join-s-q-l, taking a join type, returning string, with a match that handles each case. Case inner returns inner join. Case left-outer returns left outer join. Custom of pred returns join on parentheses pred. The compiler ensures every case is covered.
+
+Pattern matching preview — and why these shapes pair so well.
+
+Notebook six covers pattern matching in depth. The reason it lives next to this notebook — case classes and enums are precisely the shapes pattern matching is designed to destructure.
+
+A case class declares both the shape and the deconstruction in one line. An enum declares the closed set of shapes in one block. The match expression in your code then matches against those shapes by name, the compiler checks exhaustiveness, and the destructuring pulls fields out by name.
+
+In code, picture enum notification with three cases — email taking a recipient and subject, s-m-s taking a recipient and body, push taking a device i-d, title, and body. Then def render, taking a notification, returning a formatted string. The match expression has three cases that pull the relevant fields out by name. A list of three example notifications maps through render and prints each formatted line.
+
+What is next.
+
+You can now model both behaviour, with classes, objects, and traits, and data, with case classes and enums. The two halves of object-oriented Scala.
+
+Notebook six takes the data half and runs with it. Pattern matching — the syntactic feature you have already glimpsed in this notebook — gets a thorough treatment. Then option, try, and either — the three standard-library types that encode value might be missing, computation might have failed, and result is one of two possible types. All three are sealed algebraic data types that match like case classes, and all three replace a category of bugs that languages without them suffer from.
