@@ -7,6 +7,7 @@ import { errorsCourse } from './errors'
 // './types' alone resolves to types.ts (the shell type alias), so the course folder is named in full.
 import { typesCourse } from './types/index'
 import { typeClassesCourse } from './type-classes'
+import { projectsTestingCourse } from './projects-testing'
 import type { Course, Section } from './types'
 
 // Course registry, in syllabus order. Courses are added here as each is authored.
@@ -19,6 +20,7 @@ export const COURSES: Record<string, Course> = {
   [errorsCourse.id]: errorsCourse,
   [typesCourse.id]: typesCourse,
   [typeClassesCourse.id]: typeClassesCourse,
+  [projectsTestingCourse.id]: projectsTestingCourse,
 }
 
 export type { Course, Section }
