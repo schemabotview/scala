@@ -245,6 +245,22 @@ if (DENSITY) {
   console.log(`${warns.length ? '⚠' : '✓'} density: ${density.length - warns.length}/${density.length} sections in band (slide ${SLIDE_H_MIN}–${SLIDE_H_MAX}px, narration ${NARR_WORDS.join('–')}w)\n`)
 }
 
+// --- scenes: node ids must be unique within a scene ---------------------------------------------
+// react-flow keys nodes by id, so a code card and a leaf that share one (`using` the card, `using`
+// the leaf) silently collapse into a single node: the card vanishes and its edges reroute through the
+// container. It builds, type-checks and passes every other guard. Found on type-classes-givens.
+for (const file of walk('src/scenes')) {
+  const src = readFileSync(file, 'utf8')
+  if (!/:\s*Scene\s*=/.test(src)) continue
+  const sceneId = (src.match(/^\s*id: '([\w-]+)',$/m) || [])[1]
+  const seen = new Set()
+  for (const [, id] of src.matchAll(/\bid: '([\w-]+)',/g)) {
+    if (id === sceneId) continue
+    if (seen.has(id)) problems.push(`${file}  node id '${id}' is used twice — react-flow merges them`)
+    seen.add(id)
+  }
+}
+
 // --- content: every `focus` must name a node in that section's scene -------------------------
 // SceneView sets `__focus` by comparing ids, so a focus that matches nothing just fails to light
 // anything — no error, no warning. Node ids are collected per scene file; a module with no top-level
