@@ -8,11 +8,12 @@ import { errorsScenes } from './errors'
 import { typesScenes } from './types/index'
 import { typeClassesScenes } from './type-classes'
 import { projectsTestingScenes } from './projects-testing'
+import { ioInteropScenes } from './io-interop'
 
 // Scene registry. Sections reference scenes by id; scenes are grouped by course (one folder each,
 // mirroring src/content). Ids are globally unique across courses, so the flat lookup below is
 // unambiguous. Courses are added here as each is authored.
-const ALL: Scene[] = [...firstProgramScenes, ...expressionsScenes, ...functionsScenes, ...domainModellingScenes, ...collectionsScenes, ...errorsScenes, ...typesScenes, ...typeClassesScenes, ...projectsTestingScenes]
+const ALL: Scene[] = [...firstProgramScenes, ...expressionsScenes, ...functionsScenes, ...domainModellingScenes, ...collectionsScenes, ...errorsScenes, ...typesScenes, ...typeClassesScenes, ...projectsTestingScenes, ...ioInteropScenes]
 
 export const SCENES: Record<string, Scene> = Object.fromEntries(ALL.map((s) => [s.id, s]))
 

@@ -8,6 +8,7 @@ import { errorsCourse } from './errors'
 import { typesCourse } from './types/index'
 import { typeClassesCourse } from './type-classes'
 import { projectsTestingCourse } from './projects-testing'
+import { ioInteropCourse } from './io-interop'
 import type { Course, Section } from './types'
 
 // Course registry, in syllabus order. Courses are added here as each is authored.
@@ -21,6 +22,7 @@ export const COURSES: Record<string, Course> = {
   [typesCourse.id]: typesCourse,
   [typeClassesCourse.id]: typeClassesCourse,
   [projectsTestingCourse.id]: projectsTestingCourse,
+  [ioInteropCourse.id]: ioInteropCourse,
 }
 
 export type { Course, Section }
