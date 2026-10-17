@@ -23,13 +23,15 @@ Course arc: `first-program` → `expressions` → `functions` → `domain-modell
 `compatibility`. The recurring order-import example accumulates across them, so later code cards
 reuse earlier types.
 
-Status: scaffolded from `content-repo-template` (slug `scala`, brand `#dc322f`). Course 1
-(`first-program`, 6 sections) is authored — scenes, slides, narration — and awaits the owner's
-review and the Colab audio pass. Courses 2–12 are not started.
+Status: all 12 courses and 77 sections are authored — scenes, slides, narration — and every route
+measures inside both density bands. Awaiting the owner's review and the Colab audio pass; no wavs
+exist yet, so every section currently narrates silence.
 
-Scene inventory — `src/scenes/first-program/`: `compile-run-path` (PS), `toolchain-pins` (CT),
-`order-total-main` (CT), `file-vs-repl` (VS), `indent-vs-braces` (VS), `failure-stages` (CT).
-Shape keys are defined in `AUTHORING-PLAN.md` §3.
+Scene inventory — one folder per course under `src/scenes/`, one scene per section (77 scenes, none
+shared), each file's header comment naming its shape (CT, VS, PS, MEM, TB — `AUTHORING-PLAN.md` §3).
+
+`src/content/types/` (the course) sits beside `src/content/types.ts` (the shell type alias). A bare
+`'./types'` resolves to the file, so the registries import the course as `'./types/index'`.
 
 The render engine is `@graphlearning/flow`; the app shell is `@graphlearning/shell`. Both are
 **published packages pinned by version** (`flow@^1.2.0`, `shell@^0.8.0`). This repo's own surface is
@@ -57,7 +59,7 @@ The render engine is `@graphlearning/flow`; the app shell is `@graphlearning/she
 
 ## Layout rules the frames actually care about
 
-`npm run check` (`scripts/check-content.mjs`) models four silent failures — each builds green and
+`npm run check` (`scripts/check-content.mjs`) models five silent failures — each builds green and
 breaks only on screen. Its comments carry the measured constants; the short version:
 
 - **Leaf cards are a fixed 210×96** with a ~134px text column. Only containers grow to fit. Keep the
@@ -75,6 +77,11 @@ breaks only on screen. Its comments carry the measured constants; the short vers
   guessing a lucide name (`volume`, `move`, `maximize` and `git` are all absent, for instance).
 - **A section with no wav narrates silence** and records a silent segment. Audio resolves purely by
   convention: `public/audio/<course>/<section-id>.wav`.
+- **A node id used twice in one scene merges the two nodes.** react-flow keys by id: a code card and
+  a leaf both called `using` became one node, the card vanished and its edges rerouted through the
+  container. `check` now fails on it.
+- **`icon: 'monitor'` is the Azure Monitor gauge**, not a screen — the registry mixes cloud-vendor
+  glyphs in with lucide. Look at the rendered card, not the name.
 
 What `check` does *not* model: an edge label landing on top of a card, or whether the frame is too
 empty. Look at the route.

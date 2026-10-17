@@ -1,4 +1,15 @@
 {
   "_comment": "Curated publish titles (YouTube title + thumbnail header) per course, keyed by course id. Search-first: what someone would actually type, never 'Course 4'. One entry per course in src/content/index.ts.",
-  "first-program": "Your First Scala 3 Program: Compile, Run and Debug"
+  "first-program": "Your First Scala 3 Program: Compile, Run and Debug",
+  "expressions": "Scala 3 Basics: val, var, Types, Strings and Methods",
+  "functions": "Scala Functions Explained: Lambdas, Closures and Currying",
+  "domain-modelling": "Scala Case Classes, Enums and Pattern Matching",
+  "collections": "Scala Collections: map, filter, flatMap and foldLeft",
+  "errors": "Scala Error Handling: Option, Either and Try",
+  "types": "Scala 3 Generics, Variance and Opaque Types",
+  "type-classes": "Scala 3 Type Classes: given, using and Extension Methods",
+  "projects-testing": "Scala Projects with sbt: Packages, Modules and Testing",
+  "io-interop": "Scala File I/O, Resources and Java Interop",
+  "futures": "Scala Futures and Promises: Concurrency Explained",
+  "compatibility": "Scala 2 vs Scala 3: Compatibility and Next Steps"
 }

@@ -111,7 +111,16 @@ Rules that fall out of the measurements:
   cpu layers database wrench receipt tag gauge key shieldcheck scroll gitbranch ban circlecheck
   circleslash server boxes clock repeat lock scale workflow box gears memory zap brain share funnel
   copy table harddrive folder file users plug scissors link search pencil sigma hash sortarrows
-  regex bug ruler monitor`. Use only these.
+  regex bug ruler`. Use only these. (`monitor` exists but is the Azure Monitor gauge glyph.)
+- Learned on courses 2–12:
+  - A **code card over ~9 lines** makes even CT tall enough to reach the eyebrow: give it 0.17.
+  - A **table** sizes to its widest text, so a long table title makes it wide and short. Keep the
+    title short, add real rows, and use padding 0.04 (the two table boards went 0.46/0.52 → 0.77/0.64).
+  - One **long code line** (80+ chars) shrinks the whole card; break it into a chain (0.57 → 0.67).
+  - A wide grid with room above it (next-steps) floats at **0.04**, not 0.17.
+  - **Node ids must be unique within a scene**; `check` now enforces it.
+  - Where a shape key in §5 was changed while authoring (e.g. `traits` became CT, `failure-stages`
+    CT), the scene file's header comment records the shape actually used.
 
 ## 4. Narration budget
 
@@ -188,10 +197,12 @@ global scene.
 ## 6. Order of work
 
 1. ~~Pilot — course 1, `first-program`, all 6 sections.~~ Done; measurements in §1, lessons in §3.
-   Still open for it: the owner's visual review, then the Colab audio pass.
 2. ~~Delete the demo course; add course 1's title to `scripts/titles.json`.~~ Done.
-3. **Courses 2–12, one course per change**, in syllabus order — the recurring example accumulates,
-   so later code cards reuse earlier types (`Order`, `ImportError`, `OrderId`).
+3. ~~Courses 2–12, one course per change.~~ Done, one commit per course. Final measurement over all
+   77 routes: slide fill 0.80–0.93 (median 0.87); scene binding axis ≥ 0.86; scene area 0.55–0.78
+   (median 0.68); no node under the eyebrow; narration 181–209 words. All 12 titles are in
+   `scripts/titles.json`.
+   **Still open for every course: the owner's visual review, then the Colab audio pass.**
 4. Per course, before handing over: `npm run build && npx tsc --noEmit && npm run check`, then the
    `npm run check -- --density` and `npm run measure -- <course> --shots .tmp/density` (slide
    865–1000, scene axis ≥ 0.85, area ≥ 0.55), a look at every screenshot, then the owner's
