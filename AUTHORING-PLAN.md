@@ -26,6 +26,20 @@ Baseline — the template's two demo sections, measured:
 | `demo-what-a-section-is` | 739 px | 0.61 | 0.89 / 0.30 | **0.27** | both under — a 5-leaf LR chain binds on width and leaves 70 % of the height empty |
 | `demo-scene-kinds` | 777 px | 0.72 | 0.89 / 0.78 | **0.70** | scene good; slide ~120 px short |
 
+Pilot — course 1 as authored, measured the same way (`npm run measure -- first-program`):
+
+| section | shape | slide (model / rendered) | scene w / h | area |
+| --- | --- | --- | --- | --- |
+| `source-to-runtime` | PS | 890 / 0.84 | 0.86 / 0.81 | 0.69 |
+| `toolchain-versions` | CT | 942 / 0.87 | 0.89 / 0.81 | 0.73 |
+| `first-program` | CT | 942 / 0.84 | 0.89 / 0.75 | 0.67 |
+| `repl` | VS | 993 / 0.88 | 0.75 / 0.86 | 0.65 |
+| `indentation-braces` | VS | 942 / 0.87 | 0.66 / 0.86 | 0.57 |
+| `failure-stages` | CT | 942 / 0.88 | 0.82 / 0.86 | 0.71 |
+
+All six in band on both surfaces. The first drafts were not: five slides modelled at 814–852 (the
+2 × 3 shape, exactly as §2 predicts) and four scenes missed — fixes recorded in §3.
+
 Two lessons from the baseline drive the whole plan: a **code card stacked over a 2-column leaf
 container** fills the pane, and a **flat LR chain never does**. And the demo slides — written by the
 people who wrote the guard — still sit under the floor, so the floor has to be designed in, not
@@ -82,10 +96,17 @@ Rules that fall out of the measurements:
 - **4 leaves per container, `cols: 2`.** Six fits too (3 rows); two leaves leave a hole.
 - Leaf text budget: label ≤ 2 lines at 12 chars, sub ≤ 2 lines at 20 chars, no unbreakable token
   over 14 (label) / 20 (sub). `foldLeft(0)(_ + _)` cannot go in a leaf — put it in the code card.
-- Code-card width: ≤ 60 chars/line is a **guess** for a single card that still binds on height;
-  the pilot measures it. Two cards side by side are never used — they bind on width.
-- Scene `padding`: 0.04 for CT/PS boards that float; 0.12–0.17 for tall boards that reach the
-  eyebrow.
+- Code-card width: a 7-line card at 60 chars/line still binds on height (`toolchain-pins`), so
+  **≤ 60** holds. Two cards side by side are never used — they bind on width.
+- **VS is the weakest shape** (0.57–0.65): two stacked cards make a tall, narrow board. Keep each
+  card ≤ 7 lines and give the longest line ~45+ chars so the board widens.
+- Scene `padding`: the engine default is **0.12**. Use **0.17** on any stacked board of three
+  ranks (VS, PS) — at 0.12 all four reached the eyebrow; 0.17 cleared it and cost ~0.04 area.
+  Lowering it below 0.12 *grows* the board, so 0.04 is for boards that float, never for tall ones.
+- Measured dead ends from the pilot: a 6-leaf trace at `cols: 3` (wide and short, area 0.45 → 0.71
+  at `cols: 2` with each row pairing a stage and its fix); a PS stage as one 4-wide row (tiny type,
+  area 0.41). A PS board that is a narrow tower (0.52) is fixed by a **3-wide top row**, not by
+  flattening the stages.
 - Icons are not guarded. Verified present in the installed engine: `terminal code filecode braces
   cpu layers database wrench receipt tag gauge key shieldcheck scroll gitbranch ban circlecheck
   circleslash server boxes clock repeat lock scale workflow box gears memory zap brain share funnel
@@ -166,26 +187,24 @@ global scene.
 
 ## 6. Order of work
 
-1. **Pilot — course 1, `first-program`, all 6 sections.** Scenes, slides, narration together.
-   Then measure every frame on the route and record: actual scene area per shape, the code-card
-   line-width that still binds on height, and whether the 865 floor reads right on screen. Update
-   §1–§3 of this file with the measured numbers before course 2.
-2. Delete the demo course in the same change as course 1 lands (`src/content/demo`,
-   `src/scenes/demo`, `public/audio/demo`, both registries, its `titles.json` entry), and add
-   course 1's title to `scripts/titles.json`.
+1. ~~Pilot — course 1, `first-program`, all 6 sections.~~ Done; measurements in §1, lessons in §3.
+   Still open for it: the owner's visual review, then the Colab audio pass.
+2. ~~Delete the demo course; add course 1's title to `scripts/titles.json`.~~ Done.
 3. **Courses 2–12, one course per change**, in syllabus order — the recurring example accumulates,
    so later code cards reuse earlier types (`Order`, `ImportError`, `OrderId`).
 4. Per course, before handing over: `npm run build && npx tsc --noEmit && npm run check`, then the
-   density read on every route (slide 865–1000, scene axis ≥ 0.85, area ≥ 0.55), then the owner's
+   `npm run check -- --density` and `npm run measure -- <course> --shots .tmp/density` (slide
+   865–1000, scene axis ≥ 0.85, area ≥ 0.55), a look at every screenshot, then the owner's
    visual review, then the Colab audio pass, then `check` again (it now requires every wav).
 5. Code in code cards follows the course plan's version rule: Scala 3 indentation syntax; any
    snippet that names a library or tool version gets it from one pinned table recorded with the
    course, not inline guesses.
 
-## 7. Two small tools that would make this cheaper (not built — proposed)
+## 7. Tools
 
-- **`check --density`**: print each slide's modelled height and warn under 865. The model is
-  already there; today it only reports the ceiling, so an under-filled slide is invisible to it.
-- **`scripts/measure-density.mjs`**: the headless-Chromium measurement used for §1 — loads each
-  route with `?capture=1`, reports scene w/h/area ratio and slide fill, saves a screenshot. It
-  turns the "read it off the route by eye" step into a table per course.
+- **`npm run check -- --density`** — every slide's modelled height and narration word count, with a
+  warning under 865 px or outside 160–210 words. Never fails the build.
+- **`npm run measure`** (`scripts/measure-density.mjs`) — starts its own Vite server, renders every
+  route at 1920×1080 with `?capture=1`, and reports slide fill, scene w/h, area, and any node under
+  the eyebrow. `-- <route-prefix>` narrows it; `-- --shots <dir>` saves a screenshot per route.
+  Uses puppeteer's browser, or `PUPPETEER_EXECUTABLE_PATH`. Never fails the build either.

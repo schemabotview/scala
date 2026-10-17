@@ -26,6 +26,10 @@
 // against. Keep icon names honest by eye until the package exports the registry.
 //
 // Run: npm run check
+//      npm run check -- --density   also print every slide's modelled height and narration length,
+//                                   and warn (never fail) on a slide under SLIDE_H_MIN or a narration
+//                                   outside NARR_WORDS. Density is a target, not a threshold — see
+//                                   AUTHORING-PLAN.md §1 — so it reports and leaves the call to you.
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -50,6 +54,11 @@ const LINE_SUB = 15.6 // 13px × 1.2
 // 1000 costs two bullets a slide and makes the frame safe to review anywhere. The `models` course,
 // authored before this was found, sits at 753–904 and renders correctly in every window tried.
 const SLIDE_H_MAX = 1000
+// The density floor: 80 % of the ~1080 design-px pane. Below it the slide pane reads as half empty.
+// Only reported under --density; the two demo slides the template ships model at 739 and 777.
+const SLIDE_H_MIN = 865
+const NARR_WORDS = [160, 210] // ≈ 65–85 s; the narration budget in AUTHORING-PLAN.md §4
+const DENSITY = process.argv.includes('--density')
 const PANE = 806, PAD_X = 60, FS = 26
 const TEXT_W = PANE - PAD_X * 2 // 686
 const LI_W = TEXT_W - 30 // li has padding-left: 30
@@ -212,6 +221,7 @@ for (const file of walk('src/scenes')) {
 }
 
 // --- content: slide budget --------------------------------------------------------------------
+const density = []
 for (const file of walk('src/content')) {
   const src = readFileSync(file, 'utf8')
   const m = src.match(/slide: `([\s\S]*?)`,\n  narration/)
@@ -219,6 +229,20 @@ for (const file of walk('src/content')) {
   const slide = m[1].replace(/\\`/g, '`')
   const h = slideHeight(slide)
   if (h > SLIDE_H_MAX) problems.push(`${file}  slide ${h}px > ${SLIDE_H_MAX} — clips at the bottom`)
+  // Narration is a double-quoted string when it carries an apostrophe, so accept every quote style.
+  const n = src.match(/\bnarration:\s*(["'`])([\s\S]*?)\1,?\s*\n\}/)
+  density.push({ file, h, words: n ? n[2].trim().split(/\s+/).length : 0 })
+}
+if (DENSITY) {
+  const warns = []
+  for (const { file, h, words } of density) {
+    const flags = []
+    if (h < SLIDE_H_MIN) flags.push(`slide under ${SLIDE_H_MIN}`)
+    if (words < NARR_WORDS[0] || words > NARR_WORDS[1]) flags.push(`narration outside ${NARR_WORDS.join('–')} words`)
+    console.log(`${String(h).padStart(5)}px ${String(Math.round((h / 1080) * 100)).padStart(3)}%  ${String(words).padStart(4)}w  ${file}${flags.length ? '  ⚠ ' + flags.join(', ') : ''}`)
+    if (flags.length) warns.push(file)
+  }
+  console.log(`${warns.length ? '⚠' : '✓'} density: ${density.length - warns.length}/${density.length} sections in band (slide ${SLIDE_H_MIN}–${SLIDE_H_MAX}px, narration ${NARR_WORDS.join('–')}w)\n`)
 }
 
 // --- content: every `focus` must name a node in that section's scene -------------------------

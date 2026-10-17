@@ -23,8 +23,13 @@ Course arc: `first-program` → `expressions` → `functions` → `domain-modell
 `compatibility`. The recurring order-import example accumulates across them, so later code cards
 reuse earlier types.
 
-Status: scaffolded from `content-repo-template` (slug `scala`, brand `#dc322f`). The demo course
-is still registered so the scaffold builds; it is deleted in the change that lands course 1.
+Status: scaffolded from `content-repo-template` (slug `scala`, brand `#dc322f`). Course 1
+(`first-program`, 6 sections) is authored — scenes, slides, narration — and awaits the owner's
+review and the Colab audio pass. Courses 2–12 are not started.
+
+Scene inventory — `src/scenes/first-program/`: `compile-run-path` (PS), `toolchain-pins` (CT),
+`order-total-main` (CT), `file-vs-repl` (VS), `indent-vs-braces` (VS), `failure-stages` (CT).
+Shape keys are defined in `AUTHORING-PLAN.md` §3.
 
 The render engine is `@graphlearning/flow`; the app shell is `@graphlearning/shell`. Both are
 **published packages pinned by version** (`flow@^1.2.0`, `shell@^0.8.0`). This repo's own surface is
@@ -87,17 +92,22 @@ builds green, reads correctly, and leaves half its pane empty. Against the ~1080
 | eyebrow | no node under the top-left eyebrow label | boards that bind on height run up to y≈30 |
 
 Levers: **add real content, not padding**; **restack** a board toward the pane's ~1:1 aspect; lower
-scene `padding` to 0.04 for boards that float, **raise** it (0.12–0.17) for tall boards that touch
-the eyebrow.
+scene `padding` to 0.04 for boards that float, **raise** it to 0.17 for tall boards that touch
+the eyebrow. The engine's default is **0.12** (read off `@graphlearning/flow`), so anything between
+0.04 and 0.12 *enlarges* the board.
 
-These are read off the rendered route by eye — `check` models no density at all. The two ratios come
-from one repo's ~80 frames of diagram-and-code-card boards, so a deliberately sparse board can sit
-under them. Targets, not thresholds.
+Both bands are measured, not eyeballed: `npm run check -- --density` reports every slide's modelled
+height and narration length; `npm run measure` renders every route and reports slide fill, scene
+axis and area, and eyebrow overlap (`-- <route-prefix>` to narrow, `-- --shots <dir>` for
+screenshots; set `PUPPETEER_EXECUTABLE_PATH` to use an installed Chromium). Neither fails the build —
+the ratios come from one repo's ~80 frames, so a deliberately sparse board can sit under them.
+Targets, not thresholds. Neither sees an edge label landing on a card: look at the screenshots.
 
 ## Guards before handing over
 
 ```sh
 npm run build && npx tsc --noEmit && npm run check
+npm run check -- --density && npm run measure -- <course> --shots .tmp/density
 ```
 
 All three are a **floor, not proof** — they pass on frames that are visually wrong. The rendered
