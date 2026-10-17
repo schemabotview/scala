@@ -2,6 +2,7 @@ import { firstProgramCourse } from './first-program'
 import { expressionsCourse } from './expressions'
 import { functionsCourse } from './functions'
 import { domainModellingCourse } from './domain-modelling'
+import { collectionsCourse } from './collections'
 import type { Course, Section } from './types'
 
 // Course registry, in syllabus order. Courses are added here as each is authored.
@@ -10,6 +11,7 @@ export const COURSES: Record<string, Course> = {
   [expressionsCourse.id]: expressionsCourse,
   [functionsCourse.id]: functionsCourse,
   [domainModellingCourse.id]: domainModellingCourse,
+  [collectionsCourse.id]: collectionsCourse,
 }
 
 export type { Course, Section }
