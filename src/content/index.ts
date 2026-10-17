@@ -1,11 +1,13 @@
 import { firstProgramCourse } from './first-program'
 import { expressionsCourse } from './expressions'
+import { functionsCourse } from './functions'
 import type { Course, Section } from './types'
 
 // Course registry, in syllabus order. Courses are added here as each is authored.
 export const COURSES: Record<string, Course> = {
   [firstProgramCourse.id]: firstProgramCourse,
   [expressionsCourse.id]: expressionsCourse,
+  [functionsCourse.id]: functionsCourse,
 }
 
 export type { Course, Section }
