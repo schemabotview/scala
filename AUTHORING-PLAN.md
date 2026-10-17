@@ -200,7 +200,7 @@ global scene.
 2. ~~Delete the demo course; add course 1's title to `scripts/titles.json`.~~ Done.
 3. ~~Courses 2–12, one course per change.~~ Done, one commit per course. Final measurement over all
    77 routes: slide fill 0.80–0.93 (median 0.87); scene binding axis ≥ 0.86; scene area 0.55–0.78
-   (median 0.68); no node under the eyebrow; narration 181–209 words. All 12 titles are in
+   (median 0.68); no node under the eyebrow; narration 178–209 words. All 12 titles are in
    `scripts/titles.json`.
    **Still open for every course: the owner's visual review, then the Colab audio pass.**
 4. Per course, before handing over: `npm run build && npx tsc --noEmit && npm run check`, then the
